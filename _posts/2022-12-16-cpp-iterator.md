@@ -242,10 +242,8 @@ int main()
   remove_reference<int&>::value // check whether true or false
 ```
 
-```
 > 只有模板类才能做偏特化，因为类不能够重载。模板函数只能做全特化
 {: .prompt-info }
-```
 
 另一个迷惑性的例子（来自[Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](http://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)）
 
