@@ -100,7 +100,6 @@ GEM
     yell (2.2.2)
 
 PLATFORMS
-  ruby
   x86_64-linux
 
 DEPENDENCIES
@@ -110,6 +109,9 @@ DEPENDENCIES
   tzinfo-data
   wdm (~> 0.1.1)
   webrick (~> 1.7)
+
+RUBY VERSION
+   ruby 2.7.0p0
 
 BUNDLED WITH
    2.3.26
