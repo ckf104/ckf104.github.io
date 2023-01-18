@@ -1,0 +1,4 @@
+`target_include_directory`
+
+> Include directories usage requirements commonly differ between the build-tree and the install-tree. The [`BUILD_INTERFACE`](https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#genex:BUILD_INTERFACE) and [`INSTALL_INTERFACE`](https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#genex:INSTALL_INTERFACE) generator expressions can be used to describe separate usage requirements based on the usage location. Relative paths are allowed within the [`INSTALL_INTERFACE`](https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#genex:INSTALL_INTERFACE) expression and are interpreted as relative to the installation prefix. Relative paths should not be used in [`BUILD_INTERFACE`](https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#genex:BUILD_INTERFACE) expressions because they will not be converted to absolute.
+
