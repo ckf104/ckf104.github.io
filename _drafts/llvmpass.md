@@ -26,6 +26,7 @@
 * IR库中的全局参数要怎么传递，clang的`-mllvm`参数吗
 * trailingobject的totalSizeToAlloc方法，这样写是否会因对齐导致问题？ValueHandle.h AssertVH的GetAsValue参数是不是不太对（应该是ValueTy？）
 * SCEV论文中谈到的一些问题：Wraparound Variable Analysis, Cyclic Recurrence, 这些问题在LLVM中如何解决的？
+* 在scalarEvolution类中，一个SCEV如何对应到多个value上去（例如：标识ADDREC SCEV的REFID包含信息：SCEV TYPE，SCEV OPS，LOOP，取俩变量步长和初始值都相同，他们就对应到同一个SCEV上去了，这个可以用来消除冗余变量？），SCEVTraversal怎么说？
 
 
 
@@ -35,7 +36,7 @@
 
 * 看看IR中的intrinsics，关注如何手动添加，看看llvm-epi是怎么做的
 * 回头看vegen的代码
-* llvm中各种数据结构的实现方式，例如StringMap, Constants(vector), zip, scalar evolution(isconsecutive), pattern match,Alias Analysis，vegen loop unroll, loop peel, assumption cache，LazyValueInfo，BlockFrequencyInfo，TargetTransformInfo, DependenceInfo
+* llvm中各种数据结构的实现方式，例如StringMap, Constants(vector), zip, scalar evolution(isconsecutive), pattern match,Alias Analysis，vegen loop unroll, loop peel, assumption cache，LazyValueInfo，BlockFrequencyInfo，TargetTransformInfo, DependenceInfo, TargetLibraryInfo
 * 查ARM, X86加一些非SIMD指令的原因, 考虑一些相关的benchmark，ARM scalable vector extension
 
 
