@@ -1,5 +1,5 @@
 ---
-title: Understand Git: a Bottom-up Approrach
+title: "Understand Git: a Bottom-up Approrach"
 date: 2023-05-04 15:44:45 +800
 categories: [tools usage]
 ---
