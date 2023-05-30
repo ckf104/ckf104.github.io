@@ -23,7 +23,7 @@ categories: [Compiler]
 
 ## 2. 流图可规约性的等价定义
 
-![](../res/base-cfg.png "不可规约流图的基本结构")
+![](/res/base-cfg.png "不可规约流图的基本结构")
 
 
 
