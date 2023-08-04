@@ -27,6 +27,8 @@ core library 是一个目录，这个目录可以指定为本地目录，也可�
 
 fusesoc.conf 文件中指定了若干的 core library 的位置（本地目录或者远程的 git 仓库）。然后 Fusesoc 会在这些指定的目录，以及它们的次级目录中寻找后缀名为 core 的文件。记录这些文件对应 IP 的名字（在前面的例子中就需要在这些 core 文件中找到 IP 名称为 ara 的文件，并一步定位它的依赖对应的 core 文件位置）。
 
+fusesoc.conf 文件可以通过`fusesoc library`系列命令来进行创建和修改
+
 ## 2. core 文件内容与脚本自动化
 
 core file 是一个 yaml 文件，首先它包含了它对应 IP 的名称，该名称用于指定依赖。通常该名称由三部分组成 `A::B:C`，A 通常用于指定组织名，B 用于指定该 IP 具体的名称，C 用于指定该 IP 的版本。然后是指定各种 fileset，每一类 fileset 通常有各种的用途（类似于 vivado 中的 sources_1, constraints_1 等等）。第一个 fileset 通常名称为 rtl，是组成该 IP 的所有文件。然后通常会有一个名称为 tb 的 fileset，包含用于 IP 测试验证相关的文件，还可以有一些 constraints fileset，用来包含一些 xdc 文件。或者用一个 fileset 来指定一些 tcl 脚本（例如在 target 选择的工具为 vivado 时，指定的 tcl 脚本将会在项目创建后运行）。
