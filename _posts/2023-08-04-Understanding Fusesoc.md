@@ -39,5 +39,12 @@ core file 是一个 yaml 文件，首先它包含了它对应 IP 的名称，该
 
 最后值得一提的是，Fusesoc 对每个 target 的执行分为了三个阶段：setup，build，run。可以在命令行指定对该 target 执行到哪个阶段为止。每个阶段的具体含义可以查看文档中的 [Build stages](https://fusesoc.readthedocs.io/en/stable/user/overview.html#build-stages)。
 
-OK，暂时想到的就这么多了
+## 3. Fusesoc中指定 Vivado 中执行 tcl 脚本
 
+本节的讨论适用于在 Fusesoc 中使用 Vivado 工具进行综合。在第 1 节提到 Fusesoc 中可以插入 tcl 脚本，在 Vivado 进行综合前会执行该脚本。实际的需求可能是需要 Vivado 综合或者实现完成后执行特定脚本，而不是在综合前。在 Fusesoc 的 [issue 203](https://github.com/olofk/fusesoc/issues/203) 中讨论了这个问题。Vivado 中实际上提供了一些 hook property。[**Using Tcl Scripting (UG894)** ](https://docs.xilinx.com/r/en-US/ug894-vivado-tcl-scripting/Defining-Tcl-Hook-Scripts)中可以通过 set_property 指令来设置在特定阶段执行脚本。例如
+
+```tcl
+set_property STEPS.SYNTH_DESIGN.TCL.POST {C:/Data/report.tcl} [get_runs synth_1]
+```
+
+表示在综合完成后执行`report.tcl`脚本。更多的 hook property 可以参考上面链接中的文档。为把这个特性运用在 Fusesoc 中，只需要添加一个新的 tcl 脚本，它的内容便是上面这一行代码，然后 Fusesoc 在 Vivado 启动时便会执行上面这一行脚本，使得 Vivado 在指定阶段执行实际的 report.tcl 脚本。
