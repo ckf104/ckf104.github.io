@@ -1,6 +1,7 @@
 ---
 title: Scala Trait and Class under the Hood
 date: 2023-03-26 21:02:45 +800
+math: true
 categories: [Scala]
 ---
 
