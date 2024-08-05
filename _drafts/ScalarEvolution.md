@@ -30,3 +30,8 @@ class SCEVExpander;
 ```
 
 SCEV表达式，获取范围时选择unsigned, signed的区别？因为SCEV中并不区分unsigned, signed，所以最后实际的范围可以两个取交集？
+
+NSW , NUW , NW  的一些作用
+
+* NSW，NUW：用于加法和乘法SCEV，表明SCEV不会符号溢出或者无符号溢出
+* NW：表明addRec表达式的值不会wrap，NSW, NUW可推出NW（那一个高次多项式反复得到同一个值算wrap吗？）

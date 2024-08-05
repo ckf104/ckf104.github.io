@@ -1,0 +1,506 @@
+## MSBuild
+
+* 在 `.csproj` 文件中 `<Project Sdk="Microsoft.NET.Sdk">` 表示 SDK style project。相比于通常的 `.csproj` 文件，会隐式导入 `Sdk.props` 和 `Sdk.targets`，提供许多额外的 property 和 targets
+
+```xml
+<Project>
+  <!-- Implicit top import -->
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  ...
+  <!-- Implicit bottom import -->
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>
+```
+
+* `dotnet new console` 产生的模板包含 top level statements 而不是在类中定义 main 函数等等。这是新的 csharp 的写法，参考 [top level statements](https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/program-structure/top-level-statements) 
+* 参考 [理解C#项目构建配置文件——MSBuild csproj文件](https://zhuanlan.zhihu.com/p/509046784)，自定义 target 需要放在 Directory.Build.targets 文件中，试了一下，直接放在 csproj 文件中确实不行，不知道为啥。另外 [.NET project SDKs](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/overview) 中推荐的是放在 build 目录中，没试过，看起来更复杂一些
+
+## sln file
+
+`dotnet new console` 创建的项目中除了 `.csproj` 文件外，还有一个 `.sln` 文件，它包含了所有的 project。参考 [Solution (.sln) file](https://learn.microsoft.com/en-us/visualstudio/extensibility/internals/solution-dot-sln-file?view=vs-2022)，我的理解是这样，project 之间的相互依赖都定义在 `.csproj` 中，该文件定义了最终如何编译整个项目。而 `.sln` 文件的主要目的是创建一个项目视图 `solution explorer`，在 `.sln` 中我们用 `Project, EndProject` 关键字列举出所有的 project 文件（如果 project type 为 2150E333-8FDC-42A3-9474-1A3956D46DE8 则表明是 solution folder，即在 `solution explorer` 下创建新的文件夹，关于所有可能的 project type 可参考 [What is the significance of ProjectTypeGuids tag in the visual studio project file](https://stackoverflow.com/questions/2911565/what-is-the-significance-of-projecttypeguids-tag-in-the-visual-studio-project-fi)），然后在 `GlobalSection(NestedProjects) = preSolution` 中列举各个 project 的层级关系，产生最终的项目视图，而这个项目视图本身不需要和真实的文件结构一致。项目视图的叶子节点是 project，如果展开 project 下面的层级，这些层级对应的就是真实的文件结构了
+
+这样做的好处是创建了一个虚拟的查看项目的视图，而各个 project 本身不需要放在相邻的文件结构中。当然 sln 文件中还有需要其它的 `GlobalSection`，此处没有细究这些是干什么的了
+
+## UBT
+
+* debugging csharp use `coreclr` debug type, instead of `dotnet`, see [csharp debugging](https://code.visualstudio.com/docs/csharp/debugging)
+* 源码中的变量 `UnrealBuildTool.RemoteIniPath` 的作用是什么
+* Build 模式下的 `-XmlConfigCache=` 参数是干嘛的，和 buildGraph 有关系吗，`BuildConfiguration.xml` 在 UBT 中起到什么样的作用
+* 目前看到的基本概貌是：
+  * 决定 `UnrealBuildTool` 功能的决定参数是 `-Mode` 选项，每个可选的 mode 在代码中都是 `ToolMode` 的子类，`ToolMode` 有一个 `ExecuteAsync` 函数，`UnrealBuildTool` 会调用这个函数将执行权交给该 mode
+  * `GlobalOptions` 中包含了 `UnrealBuildTool` 的一些全局参数，即可以通过 `-Help` 看到的参数。因此 `UnrealBuildTool` 在调用 `ExecuteAsync` 前会使用 `CommandLineArguments` 对象来预处理一波命令行参数，将能识别的值设置在 `GlobalOptions` 中。这个 `CommandLineArguments` 会原封不动地又传给 mode
+* `-game` `-engine` 参数都是些啥意思，试了一下，好像 `RunUBT.sh -projectfiles -project=xx.uproject -game -engine` 才能生成相应的 code-workspace 文件
+
+```shell
+# Generate vscode project files (workspace file and .vscode directory)
+$ ~/src/UnrealEngine-5.3.2-release/GenerateProjectFiles.sh -Vscode -game -engine -project=/home/ckf104/src/TP_ThirdPerson/TP_ThirdPerson.uproject
+# After running above command, workspace file and `.vscode`, `Intermediate`, `Saved` folder will be generated. And `Intermediate` folder contain a `.csproj` file. By this `csproj` file, C# dev kit could generate a `sln` file for us(This is triggered when I try to jump into definition in cs file)
+
+# Generate compile_commands.json
+$ ~/src/UnrealEngine-5.3.2-release/Engine/Build/BatchFiles/RunUBT.sh TP_ThirdPersonEditor  Development Linux -project /home/ckf104/src/TP_ThirdPerson/TP_ThirdPerson.uproject -Mode=GenerateClangDatabase -OutputDir=/home/ckf104/src/TP_ThirdPerson/
+
+# Run UHT to generate header
+$ ~/src/UnrealEngine-5.3.2-release/Engine/Build/BatchFiles/RunUBT.sh -target="TP_ThirdPersonEditor Linux Development /home/ckf104/src/TP_ThirdPerson/TP_ThirdPerson.uproject"  -Mode=UnrealHeaderTool
+
+# Now, a complete project has been created!
+# We can package it!
+/home/ckf104/src/UnrealEngine-5.3.2-release/Engine/Build/BatchFiles/RunUAT.sh -ScriptsForProject=/home/ckf104/src/TP_ThirdPerson/TP_ThirdPerson.uproject \
+Turnkey -command=VerifySdk -platform=Linux -UpdateIfNeeded \
+-EditorIO -EditorIOPort=41771 -project=/home/ckf104/src/TP_ThirdPerson/TP_ThirdPerson.uproject \
+BuildCookRun -nop4 -utf8output -nocompileeditor -skipbuildeditor -cook \
+-project=/home/ckf104/src/TP_ThirdPerson/TP_ThirdPerson.uproject -target=TP_ThirdPerson \
+-unrealexe=/home/ckf104/src/UnrealEngine-5.3.2-release/Engine/Binaries/Linux/UnrealEditor -platform=Linux \
+-stage -archive -package -build -pak -iostore -compressed -prereqs \
+-archivedirectory=/home/ckf104/src/TP_ThirdPerson/ -clientconfig=Development -nocompile -nocompileuat 2 >&1 | tee log.txt
+```
+
+* 在 windows visual studio 中需要设置 editor preference 为 vs2022，详见[VisualStudio 2022 Intellisense for engine files not working in UE5](https://forums.unrealengine.com/t/ue-5-1-visualstudio-2022-intellisense-for-engine-files-not-working-in-ue5/551166)
+
+## UE Reflection and GC
+
+### 关于 Reflection 的整体目标
+
+* 每个对象有一个 meta 对象进行描述，**meta 对象具有相同的类型**。在 UE 中 uclass 描述 class，ufunction 描述 function，**fproperty 描述 property？**
+* class 能够从 uclass 中动态创建，function 能够从 ufunction 中动态调用
+* uclass，ufunction 等 meta 对象应该在什么时候创建？
+
+### 一些重要的，需要回答的问题
+
+* 哪些类型能作为 uproperty 或者 ufunction 的参数？
+
+### Others
+
+* Class Default Object？`FindObject` 函数找到元类型，可以用来枚举类型和字符串互转？我猜这个 CDO 和 static class 方法也有关系，然后 Super 是什么
+
+  * 相应的，`TSubClassOf` 这个模板是在干嘛
+  * UClass 继承自 UObject，那么 `UClass::StaticClass` 会得到又一个 UClass 类？递归这样会发生什么？
+  * 为什么需要 CDO 呢？据说动态创建新的类型时复制 CDO，为什么不能直接调用构造函数什么的（这可能吗？反射能这么实现吗？毕竟我们要求不同的类型的元类都是 UClass，UClass 不能是一个模板）
+
+* 哪些变量可以用 UProperty 宏进行声明？从 [properties](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-uproperties) 文档中看来，我猜能用 UProperty 声明的有，基本的 int，float 和 bool 类型，UE 中用的三种字符串 FString，FName，FText，然后就是用 UENUM 包裹的 enum 以及用 UStruct 包裹的 sturct，**TODO：UClass 包裹的 class 类型可以吗？**
+
+* UObject 的引用计数相关的
+
+* UE 的 GC 是如何工作的，在 [Gameplay Classes](https://dev.epicgames.com/documentation/en-us/unreal-engine/gameplay-classes-in-unreal-engine) 文档中：
+
+  >In order to ensure that components are always created, destroyed, and properly garbage-collected, a pointer to every component created in the constructor should be stored in a UPROPERTY of the owning class.
+
+  为什么会有这样的要求？
+
+* `FObjectFinder` 和 `FClassFinder`，以及 `ConstructorStatics` 是怎么工作的
+
+* Cast 类型转换如何工作的
+
+### Reflection 的全局注册（对 xxx.gen.cpp 文件的分析）
+
+* `xxx.gen.cpp` 文件是具有一定层次结构的，顶层（在文件最后）是一个静态全局数据 `FRegisterCompiledInInfo`，这个数据包含了该编译单元内所有的反射信息。它的构造函数由四部分组成
+
+  * 该编译单元所在的 package 的名字
+  * `ClassInfo`，对应一个类型为 `FClassRegisterCompiledInInfo` 的数组，每个元素对应一个用 uclass 标记的 c++ class。**我们额外对 `FClassRegisterCompiledInInfo` 包含的内容进行说明，`ScriptStructInfo` 和 `EnumInfo` 待下次再探究**
+    * `Info` 字段主要内容是包含 InnerSingleton 和 OuterSingleton 这两个字段，它们是 uclass 指针
+    * `Name` 字段表示这个 c++ class 的名字
+    * `OuterRegister` 和 `InnerRegister` 是两个函数指针，前者指向 `Z_Construct_UClass_<ClassName>` 函数，该函数根据 `FClassParams` 来构造一个 uclass，结果储存在 `Info.OuterSingleton` 中，后者指向我们熟悉的 `StaticClass` 函数，它内部调用 `GetPrivateStaticClassBody` 来构造一个 uclass，结果储存在 `Info.InnerSingleton` 中
+
+  ```c++
+  struct FClassRegisterCompiledInInfo
+  {
+  	class UClass* (*OuterRegister)();
+  	class UClass* (*InnerRegister)();
+  	const TCHAR* Name;
+  	FClassRegistrationInfo* Info;
+  	FClassReloadVersionInfo VersionInfo;
+  };
+  ```
+
+  * `ScriptStructInfo`，对应一个类型为 `FStructRegisterCompiledInInfo` 的数组，每个元素对应一个用 ustruct 标记的 c++ struct
+  * `EnumInfo`，对应一个类型为 `FEnumRegisterCompiledInInfo` 的数组，每个元素对应一个用 uenum 标记的 c++ enum
+
+  这个数据结构的构造函数会调用 `RegisterCompiledInInfo` 函数，`RegisterCompiledInInfo` 会将每个 `FXXXRegisterCompiledInfo` 注册到 `TDeferredRegistry` 的 `Registrations` 中字段中，每个类型的 `TDeferredRegistry` 都有一个对应的静态变量。不同类型对应的 `TDeferredRegistry` 的模板参数不同
+
+  ```c++
+  using FClassRegistrationInfo = TRegistrationInfo<UClass, FClassReloadVersionInfo>;
+  using FEnumRegistrationInfo = TRegistrationInfo<UEnum, FEnumReloadVersionInfo>;
+  using FStructRegistrationInfo = TRegistrationInfo<UScriptStruct, FStructReloadVersionInfo>;
+  using FPackageRegistrationInfo = TRegistrationInfo<UPackage, FPackageReloadVersionInfo>;
+  
+  using FClassDeferredRegistry = TDeferredRegistry<FClassRegistrationInfo>;
+  using FEnumDeferredRegistry = TDeferredRegistry<FEnumRegistrationInfo>;
+  using FStructDeferredRegistry = TDeferredRegistry<FStructRegistrationInfo>;
+  using FPackageDeferredRegistry = TDeferredRegistry<FPackageRegistrationInfo>;
+  ```
+
+* 我们以 uclass 为例，自顶向下地说明反射信息是如何存储的。前面提到了 `Z_Construct_UClass_<ClassName>` 中的 `FClassParams`，它包含了一个 c++ class 的全部反射信息。其中一些关键的字段有
+
+  * `PropertyArray`，它是一个 `FPropertyParamsBase` 数组，每个数组元素对应 class 中一个用 uproperty 标记的字段
+  * `FClassFunctionLinkInfo`，一个 `FClassFunctionLinkInfo` 数组，每个数组元素对应 class 中用 ufunction 标记的函数
+  * `ImplementedInterfaceArray`，它是一个 `FImplementedInterfaceParams` 数组，每个数组元素对应 class 实现的一个 ue interface
+
+* 每个 UFunction 都会有一个对应的 `FClassFunctionLinkInfo` 和 `FFuncionParams` 数据。`FFunctionParams` 保存了一个 UFunction 的全部反射信息。`FClassFunctionLinkInfo` 由两个字段构成，一个是字符串，保存了 UFunction 的名字。一个是函数指针，它指向 `Z_Construct_UFunction_<ClassName>_<UFunctionName>` 函数，这个函数根据 `FFunctionParams` 构造出 UFunction 对象。而 `FPropertyParamsBase`
+
+* 然后我们来看 `FFunctionParams` 的构成，它的一些重要字段包括
+
+  * `NameUTF8`，表示函数名称的字符串
+
+  * `PropertyArray`，它是一个 `FPropertyParamsBase` 数组，每个数组元素对应一个函数参数或者函数返回值
+  * `StructureSize`，结构体 `<ClassName>_<UFunctionName>_Parms` 的大小，这个结构体由函数参数和函数返回值组成
+  * TODO：outerfunc，superfunc，owningclassname，delegatename 等字段
+
+* 最后我们来看看 `FFunctionParams` 和 `FClassParams` 底下都有的 `FPropertyParamsBase`，它包含一个 uproperty 的全部反射信息。不过 `FPropertyParamsBase` 是一个基结构体，实际上表示各类字段的是它的子类（虽然它们实际上没有继承关系）
+
+  * `FEnumPropertyParams` 和 `FBytePropertyParams` 用来表示枚举类型。具体来说，`FBytePropertyParams` 用来表示 enum，而 `FEnumPropertyParams` 用来表示 enum class，`FBytePropertyParams` 用来表示 enum class 的 underlying type。并不是只有 enum class 对应的 params 有 underlying type 的概念，例如下面谈到的 `FArrayPropertyParams` 同样有一个 underlying type，它来表示 TArray 的元素类型。查看 `ConstructFProperty` 中的 `ReadMore` 变量就知道了
+  * `FGenericPropertyParams` 用来表示各种基本的标量类型（int，float 等等）以及 FString，FText 等 ue 内常用的类型
+  * `FObjectPropertyParams` 用来表示各种 uobject 类型（例如 weakobject，lazyobject，objectptr 等等）
+  * `FInterfacePropertyParams` 用来表示 interface 类型（例如函数参数中的 `TScriptInterface` 就是用这个 params 来表示的）
+  * `FClassPropertyParams` 用来表示 UClass 类型（例如 `TSubclassOf`）
+  * `FStructPropertyParams` 用来表示用 UStruct 标记过的结构体
+  * 还有 `FArrayPropertyParams` 用来表示用 TArray 等等一系列的 `FxxxPropertyParams`
+
+* 这些 `FxxxPropertyParams` 的前面字段都与 `FPropertyParamsBase` 相同。我们重点看下 `FPropertyParamsBase` 都与哪些重要的字段
+
+  * `NameUTF8` 是一个表示字段名称的字符串
+  * `PropertyFlags` 是一个 flag 位域，比较重要的例如 `CPF_Parm` 表示该 params 描述的是函数参数，`CPF_OutParm` 表示该参数是引用参数，`CPF_ReturnParm` 表示该参数是返回值
+  * `EPropertyGenFlags` 描述了该 params 代表的字段的类型
+  * `Offset` 在 `FPropertyParamsBaseWithOffset` 结构体中，表示字段在类中的偏移。如果它表示的是函数参数，那么这个偏移是在参数结构体 `<ClassName>_<UFunctionName>_Parms` 中的偏移
+
+  这样我们就自顶向下地说完了整个 `xxx.gen.cpp` 的内容
+
+### 消耗注册
+
+在 ue 的 CoreUObject 模块中，它的 module 类为 `FCoreUObjectModule`，在它的 `StartupModule` 函数中，调用了 `UClassRegisterAllCompiledInClasses` 函数，大钊的 insideUE4 对这部分流程讲得很清楚了，我主要额外说一些关键的事情。
+
+* uclass 虽然有 innerSingleton 和 outerSingleon 两个，但它们都指向的同一个构建出来的 uclass。首先调用的 InnerRegister 函数，然后调用的是 outerRegister 函数（这个函数最终构建了 ufunction 和 uproperty 到 uclass 中）
+
+* ufunction 的大概调用原理：每个 ufunction 都生成了对应的 params 结构体，**然后我们知道每个参数在 params 结构体中的偏移。每个有 ufunction 有个对应的 `exec<UFunctionName>`，这个函数以 void* 指针的形式接收 params 结构体（因为我们需要保证所有的 `exec<UFunctionName>` 签名相同）**，还原出参数列表，然后调用实际的函数。对于动态代理来说，UHT 为它代理的函数签名生成了一个 wrapper 函数，这个 wrapper 函数就负责将传入的参数转化为函数签名对应的 params 结构体，然后动态查找调用 UFunction
+
+* uclass 是如何构建出 uobject 的：uclass 有一个成员 classconstructor，它是对应 c++ class 的构造函数。具体来说，通常在 `xxx.generated.h` 函数中，会有一个 `DEFINE_DEFAULT_CONSTRUCTOR_CALL` 宏，这个宏定义了一个类的静态函数
+
+  ```c++
+  static void __DefaultConstructor(const FObjectInitializer& X) { 	 	      					new((EInternal*)X.GetObj())TClass;        
+  }
+  #define DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(TClass) \
+  	static void __DefaultConstructor(const FObjectInitializer& X) { new((EInternal*)X.GetObj())TClass(X); }
+  ```
+
+  它实际上就是利用 placement new，为传入的 uobject，调用它的类的无参构造函数（另一个宏会调用将  FObjectInitializer 作为参数的构造函数）。同时 uclass 的父类 ustruct 的 PropertySize 字段保存了 uclass 对应的 c++ class 的大小。所以 uclass 只需要分配一块 `PropertySize` 大小的内存，然后在这块内存上调用 classconstructor，就得到了新的 uobject
+
+* CreateDefaultSubobject 和 NewObject 最终都是用 uclass 的 classconstructor 来构造出 uobject，区别是前者是 uobject 的成员函数，而后者是全局的一个函数。**前者会设置新的 object 的 outer 为 this（例如我们在 actor 的构造函数中调用前者，this 就为 actor，就是我们说的 component 的 outer 为 actor）。后者的 outer 是手动传参进去的**。**TODO：另一个显著区别在于前者使用的 FObjectInitializer 不同，这块我就不理解了**
+
+* 一些关键字段的含义
+  * 在 uclass 的 `FuncMap` 字段，记录了 UClass 中所有的 UFunction
+  * 在 ustruct 的 `Children` 字段，将所有的 ufunction 串联成了一个单链表
+  * 在 ustruct 的 `ChildProperties` 字段，将所有的 fproperty 串联成了一个单链表
+
+TODO：
+
+* ~~**在 `UStruct::Link` 函数中，调用了 `Property->LinkWithoutChangingOffset(Ar)` 函数，但这个函数内部的实现是 `check(0)`，会直接崩掉？是我哪理解错了吗**~~：**在 vscode 对虚函数点击 show all implementation 并不一定能够把所有的 implmentation 都显示出来，例如这里的模板继承**
+
+  ```c++
+  template<typename InTCppType, class TInPropertyBaseClass>
+  class TProperty : public TInPropertyBaseClass, public TPropertyTypeFundamentals<InTCppType>
+  // clang 没分析出来某一个 TProperty 的实例是我们要的 implementation 之一
+  ```
+
+  
+
+* **检查 ue5.3 中是否支持 enum class : uint16 等等类型（我觉得是可以的，网上说只能用 uint8 估计是老版本的限制）**
+* 理解 `FUObjectArray GUObjectArray;` 的结构，理解 `FUObjectHashTables` 这个全局静态结构
+* **UFunction 是如何调用的（关注它如何处理引用和默认参数）**
+* **CDO 是如何创建的，如何从 UClass 中动态创建一个新类型，UCLASS 中的 classconstructor 字段，以及 uclass::bind 是什么时候调用的**
+* 如何确定一个编译单元所在的 package，例如，`CameraComponent.gen.cpp` 的 package 名为 `/Script/Engine`
+* `ClassWithin` 字段是干什么的，我原本以为是不是 outer 的 uclass 之类的，但发现大部分类的 `ClassWithin` 都对应 UObject 的 uclass。只有少部分使用了 `DECLARE_WITHIN` 或者 `DECLARE_WITHIN_UPACKAGE` 宏的类是例外
+
+## Actor and Component
+
+* AActor 中重要的一些字段
+
+```c++
+	UPROPERTY(DuplicateTransient)
+	TObjectPtr<class UInputComponent> InputComponent;
+
+	/** Pawn responsible for damage and other gameplay events caused by this actor. */
+	UPROPERTY(BlueprintReadWrite, ReplicatedUsing=OnRep_Instigator, meta=(ExposeOnSpawn=true, AllowPrivateAccess=true), Category=Actor)
+	TObjectPtr<class APawn> Instigator;
+
+	/** Array of all Actors whose Owner is this actor, these are not necessarily spawned by UChildActorComponent */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AActor>> Children;
+
+	UPROPERTY(BlueprintGetter=K2_GetRootComponent, Category="Transformation")
+	TObjectPtr<USceneComponent> RootComponent;
+
+	/** The UChildActorComponent that owns this Actor. */
+	UPROPERTY()
+	TWeakObjectPtr<UChildActorComponent> ParentComponent;	
+
+	/**
+	 * All ActorComponents owned by this Actor. Stored as a Set as actors may have a large number of components
+	 * @see GetComponents()
+	 */
+	TSet<TObjectPtr<UActorComponent>> OwnedComponents;
+```
+
+* `Pawn` 相比于 `Actor`，增加了处理输入的能力，例如 `SetupPlayerInputComponent` 虚函数，使得能够使用
+
+## API
+
+* 创建新对象，`CreateDefaultSubobject` vs `NewObject`
+* 类似地，[Components](https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine) 中区分 `SetupAttachment` 和 `AttachToComponent`，也是一个在构造函数，一个 during play，为什么做这样的区分？另外，在 `SetupAttachment` 中我没有看到将 child 加到 parent 的 AttachChildren 里面，为什么？
+  * 看起来在 `SetupAttachment` 中调用了 MARK_PROPERTY_DIRTY_FROM_NAME 宏，涉及ue4.25 加入的 pushmodel，不知道 parent 的 AttachChildren 是不是这样更新的
+  * 看起来是在 `USceneComponent::OnRegister` 函数中调用了 `AttachToComponent` 
+* `USceneComponent::AddLocalOffset`，给 Component 添加 Offset 的位移，位移向量是参照 Component 的局部坐标系
+* `APown::GetViewRotation` 这个函数啥意思，SpringArm 的 `GetTargetRotation` 用到了它
+
+## Input
+
+这是 [Player-Controlled Cameras](https://dev.epicgames.com/documentation/en-us/unreal-engine/quick-start-guide-to-player-controlled-cameras-in-unreal-engine-cpp) 中的处理输入的示例代码，使用 `UInputComponent` 对应的是已经弃用的基本的处理输入的方法
+
+```c++
+	// Called to bind functionality to input
+	void APawnWithCamera::SetupPlayerInputComponent(class UInputComponent* InputComponent)
+	{
+		Super::SetupPlayerInputComponent(InputComponent);
+		InputComponent->BindAction("ZoomIn", IE_Pressed, this, &APawnWithCamera::ZoomIn);
+		InputComponent->BindAxis("MoveRight", this, &APawnWithCamera::MoveRight);
+	}
+```
+
+* 关于增强输入系统
+  * `UInputMappingContext` 和 `UInputAction` 是什么关系
+  * `UInputTrigger` 是什么，它和 `ETriggerEvent` 是什么关系，为啥在 Editor 里编辑的时候编辑了 Trigger，在BindAction 时又设置了 ETriggerEvent，看这篇讲得很好 [UE5 EnhancedInput InputTrigger](https://zhuanlan.zhihu.com/p/522171880)
+  * 但是在 editor 中设置时，每个 inputAction 可以绑定多个输入然后每个输入有一系列的 trigger 和 modifier，这个和 C++ 中的 InputAction 感觉对不太上？TODO，在 editor 中重新测试一下，
+
+## Subsystem
+
+* 每个类型的 subsystem 都可以有多个吗？看起来是可以的
+
+## UE Module
+
+* 模块内的文件夹分布：文档 [Unreal Engine Modules](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-modules) 讲得很好了
+* `IMPLEMENT_MODULE` 宏是干嘛的，`IMPLEMENT_PRIMARY_GAME_MODULE` 呢？
+
+## Movement
+
+* 调用 `Pawn::AddMovementInput` 进行移动，但我没看出来这个是怎么最后反馈到 pawn 的坐标中的，根据网上的说法，一般是 `MovementComponent` 的 `TickComponent` 函数来调用 `ConsumeMovementInputVector` 等函数来获取累积输入的移动数据，进行实际的移动处理，但 `Pawn` 本身应该是没有默认绑定的 `MovementComponent` 的，而 `Character` 子类是有默认的 `CharacterMovementComponent`，看起来它的 `PerformMovement` 函数最终执行了移动操作，但这个函数太长了，完全没看懂
+  * `Pawn` 中没有默认的 `MovementComponent` 而 `Character` 有，这样的设计可以理解，定位上来讲，可以说 `Pawn` 相比于 `Actor` 增加了处理输入的能力，但 `Pawn` 如何处理输入并没有定义。而 `Character` 则相比于 `Pawn`，定义了如何处理移动相关的输入
+* 在 TP_ThirdPerson 的模板里，移动时调用 `Pawn::AddMovementInput`，位移累积在 `ControlInputVector` 中，但是在旋转时调用 `AddControllerYawInput` 时，累积的旋转积累在 `PlayerController` 的 `RotationInput`？
+  * 我理解了，这里的旋转不是说 `Pawn` 的旋转，而是摄像机视角的旋转，可以看到 `RotationInput` 会在 `UpdateRotation` 中被使用，该函数中调用了 `PlayerCameraManager::ProcessViewRotation` 来处理摄像机视角 的旋转
+
+## Delegates
+
+### 单播代理
+
+* 单播代理相关的宏 `DECLARE_DELEGATE` 实际上 typedef 了一下 `class TDelegate<>` 模板，默认情况下，`TDelegate` 的父类是 `class TDelegateBase<>`，而它内部有一个 `DelegateAllocator`，这个 allocator 提供了核心的泛化能力。简而言之，对于不同的 BInd 情况，内部会存储不同的 `DelegateInstance` 类型（创建 `DelegateInstance` 模板类型的函数当然也是一个模板函数）。如何存储不同的类型呢，调用 allocator 分配 `DelegateIntance` 大小的堆内存，然后利用 new 运算符在这块内存上调用 `DelegateInstance` 构造函数即可（每次绑定新代理函数时，调用原来的 `DelegateInstance` 的析构函数）
+
+  * 总的说来，`TDelegate` 内部只有来自基类 `TDelegateBase` 的两个成员变量 `DelegateAllocator` 和 `DelegateSize`，前者作为一个分配器，存储了指向堆上 `DelegateInstance` 的指针，后者表示实际分配的大小
+
+  * 不同的 `DelegateInstance` 都继承自基类 `IBaseDelegateInstance<FuncType, UserPolicy>`，这个基类提供了 `Execute` 等接口。而调用 `TDelegate`  的 `Execute` 等函数时，都是获取到堆上的 `DelegateInstance`（强转为它们的共同基类 `IBaseDelegateInstance` 的指针），调用 `DelegateInstance` 的 `Execute` 函数来执行
+
+  * 能否将 `TDelegate<>` 泛化得可以绑定任何参数和返回值的函数，而不需要把参数和返回值类型写在类模板参数里面？可以，但我觉得没必要（例如目前 `TDelegate<>` 中的 `Execute` 函数不是一个模板函数，因为参数类型都给在类模板里了，如果希望 `TDelegate<>` 类能够绑定任何函数，那么就需要将 `Execute` 函数变成一个模板函数，参数类型作为模板参数）
+
+* BindRaw
+
+  * 实际的 `DelegateInstance` 为 `TBaseRawMethodDelegateInstance`
+  * 绑定一个成员函数和它的类实例指针，这俩参数保存在 `TBaseRawMethodDelegateInstance` 的 `UserO bject` 和 `MethodPtr` 成员变量中
+  * 可以额外绑定一些参数值，这些参数值存储在 `TBaseRawMethodDelegateInstance` 的父类 `TCommonDelegateInstanceState` 的 `TTuple` 成员中（作为一个元组）。这些参数值在成员调用时会被添加到参数末尾。**一个微妙的使用细节是，例如希望绑定的函数类型是 `int(float, int)`，并且我们希望绑定时添加默认参数 int，那么在代理声明时应该将函数声明为一个 int 返回值，一个 float 参数（即使用 `DECLARE_DELEGATE_RetVal_OneParam` 宏），这适用于任何 Bind 函数**
+
+* BindStatic
+
+  * 实际的 `DelegateInstance` 为 `TBaseStaticDelegateInstance`
+
+  * 和 BindRaw 相似，不过绑定的是正常的函数，而不是类成员函数，因此不需要额外的 `UserObject` 成员变量
+
+* BindLambda
+
+  * 实际的 `DelegateInstance` 为 `TBaseFunctorDelegateInstance`
+  * 和 BindStatic 没啥区别，不过绑定的是 lambda 函数（我想有这个函数的主要原因是 lambda 函数的类型比较复杂，实际上  `TBaseFunctorDelegateInstance` 中专门用了一个模板参数来表示 lambda 的类型）
+
+* BindUobject
+
+  * 实际的 `DelegateInstance` 为 `TBaseRawMethodDelegateInstance`
+  * 感觉和 BindRaw 区别不大，只是说该函数限定了类实例是 UObject 的子类，然后存储该 UObject 时不是使用裸指针，而是用的 `TWeakObjectPtr`，**TODO：理解 UObject 的垃圾回收之后，回来理解这个类的实现**
+
+* 还有其它的 BindSP，BindUFunction .... 等等
+
+  * **TODO：理解 ue 的反射后再回来看 BindUFunction 是如何实现的**
+
+### 多播代理
+
+* 多播代理能够同时绑定多个需要调用的函数。`DECLARE_MULTICAST_DELEGATE` 系列宏实际上 typedef 了一下 `TMulticastDelegate<>` 模板，它内部也只有来自基类的 `TMulticastDelegateBase` 的成员变量 `InvocationList`，`CompactionThreshold`，`InvocationListLockCount`
+  * 最核心的是这个 `InvocationList`，它是一个由 `TDelegateBase` 组成的动态列表。调用代理的 `Broadcast` 时，会遍历这个 `InvocationList` 中的 `TDelegateBase`，获取它的 `DelegateInstance`，然后调用 `DelegateInstance` 的 `ExecuteIfSafe` 函数
+* 当我们调用 `TMulticastDelegate` 的 `AddStatic`，`AddUObject` 等函数时（它们对应单播情况的 `BindStatic`，`BindUObject`），`TMulticastDelegate` 会创建一个 `TDelegate`，它内部的 `DelegateInstance` 保存了调用需要的所有信息（具体保存了哪些信息已经在单播代理中讲过了）。然后将这个 `TDelegate` 加入到 `InvocationList` 中
+* 每个 `DelegateInstance` 都有一个唯一的 `FDelegateHandle`，调用 `AddStatic` 等函数时，会将创建的 `DelegateInstance` 的 `FDelegateHandle` 作为返回值返回。如果要移除某一个函数，调用 `Remove` 函数时传入这个 Handle
+* 多播代理不保证各个函数的调用顺序
+
+### 动态代理（Dynamic Delegates）
+
+* 动态代理也分单播和多播。
+* 与普通代理不同，声明单播的系列宏 `DECLARE_DYNAMIC_DELEGATE` 不是一个 typedef，而是定义了一个新的类，它继承自 `TBaseDynamicDelegate` 类。而 `TBaseDynamicDelegate` 又继承自 `TScriptDelegate`。整个类中唯一的成员变量是 `TScriptDelegate` 中的 `Object` 和 `FunctionName`。前者是一个指向 `UObject` 的弱引用，后者是绑定的函数名。每次调用 `Execute` 函数时，都会根据函数名和 `Object`，利用反射进行查找得到 `UFunction` 进行调用。因此动态代理的执行速度更慢x
+  * 调用 `BindDynamic` 函数会绑定 `Object` 和 `FunctionName`。实际上 `BindDynamic` 是一个宏，会根据传入的函数来获取函数名（因为我们只需要 `FunctionName`）。这里是一个极其精彩的使用模板进行编译期计算的例子，具体可以查看 `STATIC_FUNCTION_FNAME` 宏
+* 类似地，声明多播的系列宏 `DECLARE_DYNAMIC_MULTICAST_DELEGATE` 定义了一个新的类，它继承自 `TBaseDynamicMulticastDelegate`，而该父类又继承自 `TMulticastScriptDelegate`，整个类仅有一个成员变量 `InvocationList`。类似于普通代理的多播，这个 `InvocationList` 是一个 `TScriptDelegate` 数组。每次调用 `AddDynamic` 函数（宏）时，就会利用 `Object` 和 `FunctionName` 创建一个 `TBaseDynamicDelegate`，然后加入到 `InvocationList` 中。唯一的区别是，普通多播是通过返回的 Handle 来区分绑定的函数，而动态多播是根据 `Object` 指针和 `FunctionName` 来区分绑定的函数 
+* TODO：区分普通代理的 `BindUFunction` 和动态代理（两者都用函数名，通过反射来查找要执行的函数）
+* TODO：[UE4 Delegate 实现原理分析](https://zhuanlan.zhihu.com/p/165126317) 中谈到相比于普通代理，动态代理支持序列化，因此能够在蓝图中使用。如何理解这段话，支持序列化和在蓝图中使用有什么必然联系吗？
+
+## Global Shader
+
+* global shader 的反射是怎么搞的， layout_field 宏相关
+
+* 声明 shader 变量时，fshaderparameter.bind 干了啥？fshaderparameter 中的字段都是啥意思
+
+* RDG 中的 passParameter 结构体中的 RenderTargets 字段来设置 renderTarget
+
+* FRenderResource 到底是个啥，和 FRHIResource 的区别是什么
+
+* uniform buffer 是全局的shader 参数是啥意思，`BEGIN_UNIFORM_BUFFER_STRUCT` 和 `BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT` 有啥区别呢
+
+* https://zhuanlan.zhihu.com/p/344573382 这篇文章谈到了 `FRHIVertexDeclaration`，它其实就是用来说明顶点属性的排布（在 opengl 里面有对应的函数，比如我现在有一个顶点数据 buffer，然后我就用这个 vertex declaration 说明buffer 中哪些数据是对应 shader 中 layout 0 的数据，哪些对应 layout 1 中的数据）。下面是一个典型
+
+  ```c++
+  class FMediaVertexDeclaration : public FRenderResource;
+  
+  struct FMediaElementVertex
+  {
+  	FVector4f Position;
+  	FVector2f TextureCoordinate;
+  
+  	FMediaElementVertex() { }
+  
+  	FMediaElementVertex(const FVector4f& InPosition, const FVector2f& InTextureCoordinate)
+  		: Position(InPosition)
+  		, TextureCoordinate(InTextureCoordinate)
+  	{ }
+  };
+  
+  void FMediaVertexDeclaration::InitRHI(FRHICommandListBase& RHICmdList)
+  {
+  	FVertexDeclarationElementList Elements;
+  	uint16 Stride = sizeof(FMediaElementVertex);
+      // `FVertexElement` equals to `glVertexAttribPointer` function in opengl
+  	Elements.Add(FVertexElement(0, STRUCT_OFFSET(FMediaElementVertex, Position), VET_Float4, 0, Stride));
+  	Elements.Add(FVertexElement(0, STRUCT_OFFSET(FMediaElementVertex, TextureCoordinate), VET_Float2, 1, Stride));
+  	VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration(Elements);
+  }
+  ```
+
+  
+
+* https://logins.github.io/graphics/2021/03/31/UE4ShadersIntroduction.html 这篇文章写得很好
+
+* `FRHIRenderPassInfo` 这个包装了许多渲染时需要用到的资源，我能看懂的是这个 renderTarget 和 depthStencilTarget，前者这个结构体中还有 `ERenderTargetActions` 这个枚举变量，我猜测这个结构体的意思是设置 renderTarget 在渲染前后是否需要做什么（例如 ELoad 表示要在渲染前保留 renderTarget 之前的值，而 EStore 表示渲染后要把结果传回 CPU）
+
+* 那 `GraphicsPSOInit.DepthStencilState` 设置的这个 DepthStencilState 是个啥，和 depthStencilTarget 有啥区别（为啥两个都要设置）
+
+* 切换渲染对象时调用的是 `RHICmdList.Transition`，但我疑惑的是，ue 是怎么知道传入的 `FRHITransitionInfo` 中的纹理是干什么的？（噢，我猜测这是那个枚举变量 `ERHIAccess` 的作用，例如 ERHIAccess::RTV 就是指 render target？）
+
+  * https://blog.csdn.net/a359877454/article/details/78305046 中讲了 D3D11 中的 resource，我感觉 ue 中的 `ERHIAcess` 中的含义就是指的这个相关的
+    * Render Target：RenderTargetView（RTV）
+    * Depth Stencil：DepthStencilView（DSV）
+    * Shader Resource：ShaderResourceView（SRV）
+    * Unordered Access：UnorderedAccessView（UAV）
+
+* RHICmdList 中的 BeginRenderPass cmd 和 EndRenderPass cmd 是干什么的
+
+* `OneColorShader.h` 中的例子非常重要
+
+  * multiple render target 中的 TShaderPermutationDomain？
+
+* vetex shader 中的投影矩阵该上哪去找呢
+
+* FRHIResource，FRenderResource，FRDGResource？它们之间的区别和联系？
+
+  * 我觉得 FRHIResource 对应底层的渲染资源相关的，而 FRenderResource 是它的一个封装
+
+现在重点看 CustomDepth 这个 Pass 是怎么实现的！
+
+### Custom Depth Pass
+
+meshProcessor 的 addMeshBatch 函数的调用来自于两种
+
+* 一种是可缓存的 staticMesh，对于新加入场景的 staticMesh，`FPrimitiveSceneInfo::CacheMeshDrawCommands` 中会调用 `addMeshBatch` 函数
+* 另一种是动态生成的 mesh，在 `GenerateDynamicMeshDrawCommands` 函数中调用。而在 `DispatchPassSetup` 函数中通过 taskgraph 机制异步调用 `GenerateDynamicMeshDrawCommands` 这个函数
+* 还没有梳理得特别清楚 `ComputeRelevance` 函数和 addMeshBatch 的关系，直观上看，如果 ComputeRelevance 中的测试不通过，那么这个 mesh 就不会被调用 addMeshBatch
+
+### ComputeRelevance
+
+该函数中考虑各种 mesh 与 meshpass 的相关性（该 meshpass 是否需要处理该 mesh）
+
+* PrimitiveSceneProxy 的 GetViewRelevance 函数（子类重载）负责从 PrimitiveSceneProxy 中获取需要计算 relevance 相关的属性
+
+### Culling
+
+cpu culling来减少向gpu传输的数据？之前在 learning opengl 中都没做过这种事？
+
+
+
+要不要使用 meshmetrial shader，如果用，如何向它传入参数。输出的 renderTarget 插件中如何用上
+
+RDG？
+
+### 问题定位
+
+没有调用 customDepth 是因为需要画的三角形数量为 0
+
+* 没有调用 customDepth 是因为 `FParallelMeshDrawCommandPass::DispatchPassSetup` 中显示需要画的三角形数目为 0
+
+* 从 render 主函数中一路 call 下来的这个 `FVisibilityTaskData::ProcessRenderThreadTasks` 函数中调用了 ComputeRelevance（代码 `Context->Finalize()`） 和 SetupMeshPasses 函数（这个函数最终调用了 DispatchPassSetup 函数）
+* 没看明白 FVisibilityViewPacket 中 Relevance 字段是怎么初始化的，明天debug 看看
+* FVisivilityTaskData.DynamicMeshElements.ViewCommandsPerView 字段是最终的 viewCommand 输出
+* FVisibilityTaskData 的 ViewPackets 字段的类型为 FVisibilityViewPacket，它的 Relevance.Context 字段（类型为 FComputeAndMarkRelevance）和 Relevance.Context.Packets（类型为 FRelevancePacket）都引用的上面那个 viewCommand
+
+### OCam 相机的实现
+
+* 场景中新建了一个 FSceneRenderer，然后注册了，这有什么影响呢
+
+### 实现思路
+
+* shader 中输出的 coloar 必须是 0 到 1 吗
+* ~~类比 `CustomDepthStencilValue`，给 primitive component 添加一个新的 property `CustomStencilValue`~~
+* ~~类比 `CustomDepthStencilValue`，给 PrimitiveSceneProxy 类添加一个新的成员 `CustomStencilValue`~~
+* 添加新的处理 CustomStencil 的 meshProcessor
+  * 添加新的枚举变量 EMeshPass::CustomStencil
+  * 在 SceneVisibility.cpp 的 ComputeRelevance 函数中处理相关性（即 CustomStencil 是否需要处理这个 meshbatch，这里照着 CustomStencil 写就好了）
+  * 类比 FCustomDepthPassMeshProcessor，实现新的 FCustomStencilMeshProcessor
+* 在 struct FSceneTextures 中增加一个纹理来作为 custom stencil 的输出，在 FSceneTextures::InitializeViewFamily 中增加 custom stencil 输出纹理的初始化（这个函数也是在大的 Render 函数中被调用）
+* **Others**
+
+### Others
+
+我们来看下原来的 CustomStencilValue 都在哪些地方用了
+
+* FViewInfo 的 CustomDepthStencilValues 字段记录了所有 primitive component 的 stencil value 值，不过没看到它用。FSceneRenderer 类负责渲染工作，它的 Views 字段是一个 FViewInfo 的数组（我想应该是每个摄像机视角都对应一个 FViewInfo）
+
+* FPrimitiveUniformShaderParameters 是一个全局的 Uniform Buffer（它在 shader 里面对应 FPrimitiveSceneData 这个结构体，查看 SceneData.h），感觉这个结构体描述了 shader 需要的所有 primitive component 的信息，最后一个参数数组 CustomPrimitiveData，这个可以自定义，我决定用这个作为 stencil value，然后在材质编辑器里面读出来。并且 bHasCustomData 这个 bool 值存放在 primitive shader parameter data 的 flags 中
+
+* 在 primitiveComponent 中设置 CustomPrimitiveData 后，会调用 FScene 的 UpdateCustomPrimitiveData 函数，将更新的 PrimitiveSceneProxy 和 它的 CustomPrimitiveData 作为一对 pair 传递到 UpdatedCustomPrimitiveParams 这个 map 中。然后看下面这个函数调用栈
+
+  FDeferredShadingSceneRenderer::Render
+
+  ​    ->  FSceneRenderer::UpdateScene 
+
+  ​        ->  FScene::UpdateAllPrimitiveSceneInfos
+
+  在这个函数中遍历上面说到的这个 map 中的 pair，实际地将 新的 CustomPrimitiveData 设置在了 SceneProxy 的 CustomPrimitiveData 字段
+
+  最终在函数 FPrimitiveSceneProxy::BuildUniformShaderParameters 函数中，将这个 CustomPrimitiveData 的值暴露给了 
+
+  PrimitiveUniformShaderParametersBuilder 的 FPrimitiveUniformShaderParameters，这个参数将用来构建我们需要的 uniform buffer
+
+  由于 FPrimitiveUniformShaderParameters 的 CustomPrimitiveData 字段是 TStaticArray 类型，后者默认会将数组初始化为 0，因此不用担心 shader 收到的 CustomPrimitiveData 会是未定义的
+
+* FPrimitiveSceneShaderData 存储了 PRIMITIVE_SCENE_DATA_STRIDE（41） 个浮点，以一种更紧凑的方式保存了整个 primitive parameter 的 uniform buffer？具体的 layout 见 FPrimitiveSceneShaderData::Setup 函数。我感觉这个结构体的引入和 GPUScene 之类的有些关系，见 SceneData.ush 中两种 GetPrimitiveData 的定义方式
+
+* GetMaterialPixelParameter 函数的实现，看起来像是每个顶点工厂对应的 usf 文件有这个函数的定义
+
+* 影响 primitiveId 是否为恒为 0 的关键在于 VF_SUPPORTS_PRIMITIVE_SCENE_DATA 宏是否被定义了
+
+* PrimitiveId 的值来源于 vertexShaderInput 的 InstanceIdOffset 和 DrawInstanceId 属性，见 SceneData.ush 的 GetSceneDataIntermediates 函数，不过仅在宏 VF_SUPPORTS_PRIMITIVE_SCENE_DATA 值为 1 时有效
+
+
+
+### 问题
+
+**如何传递参数给 meterial shader**
+
+**CustomDepthPass 的 shader 都有一个 GetShaderBindings 函数，这个函数会在 BuildMeshDrawCommand 函数中被调用，在这个时候我们设置 shader 参数**
+
+PrimitiveComponent 的CustomDepthStencilValue 是怎么传递给 PrimitiveSceneProxy 的？（在直接设置 CustomDepthStencilValue 时）我猜是不是因为每一帧都会建一个新的 PrimitiveSceneProxy 之类的？
+
+UE 是如何获得回传的 GPU 数据同时不卡的呢，在 RDG 中调用 rhicmdlist.readsurfacedata 函数会极大地影响帧率，看看 URenderTarget 相关的代码？是如何回传的，以及对应的 EStoreAction 干了什么

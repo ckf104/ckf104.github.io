@@ -79,7 +79,8 @@ LLVM-EPI中对llvm源码做的一些变动:
 
 
 
-C++ 遗留
+TODO
 
-* delete unused function in class template( and static_cast in )
+* RISCV Intrinsic Wrapper ?  LLVM提供了fixed vector 来生成riscv的lowering
+* LLVM如何估计vscale Intrinsic返回值的长度呢
 

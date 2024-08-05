@@ -118,6 +118,22 @@ PySource('m5', 'm5/core.py')      # such that `import m5.core` is valid
 
 * Port 的连接关系，一些`SimObject`中定义了`Port`属性，`Port`的连接关系定义这些`SimObject`间的数据流向。
 
+在配置脚本中常见的为 `SimObject` 设置默认参数值的方法是继承该 `SimObject`，然后在子类的字段中设置属性值，例如在 官网的 learning gem5 教程中的 `two_level.py` 配置脚本中为系统配置了 L1，L2 Cache。部分代码如下
+
+```python
+class L1Cache(Cache):
+    """Simple L1 Cache with default values"""
+
+    assoc = 2
+    tag_latency = 2
+    data_latency = 2
+    response_latency = 2
+    mshrs = 4
+    tgts_per_mshr = 20
+```
+
+在 `MetaSimObject` 创建该类时会对字段进行检查，如果属性字段的作用是设置了参数值，那么 L1Cache 类对象的`_values` 字典中存入参数名和默认值的映射。在 L1Cache 实例化时，`SimObject` 基类会检查类对象的 `_values` 字典并复制到自己的 `_values` 字典中。这样做的好处是不需要实例化 `Cache` 后挨着挨着设置各个属性值了。而在实例化 C++ 对象阶段，是调用该 python 对象对应的 param 结构体的 `create` 函数，而该 python 对象对应哪个 param 结构体由对象中的特殊字段 `type` 指定，实际对应的结构体为 `${type}Param`，因此只要子类不重载 `type` 字段，子类和父类对应的 C++ 对象是相同的。
+
 ### Proxy 机制
 
 这里的 proxy 实际是就是一种 delayed resolution。在这时候我还不知道 param 的值是多少，就先用一个 proxy object 作为占位符，并存下必要的信息。等时机成熟了之后再进行 resolution，得到真正的参数值。
