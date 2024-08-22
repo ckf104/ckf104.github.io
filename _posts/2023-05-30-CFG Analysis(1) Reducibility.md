@@ -1,5 +1,5 @@
 ---
-title: "CFG Analysis(1): Reducibility"
+title: "CFG Analysis(1) Reducibility"
 date: 2023-05-30 10:45:31 +800
 math: true
 categories: [Compiler]
