@@ -1,6 +1,8 @@
 ## Sample in Disk and Sphere
 
-为了在 disk 上均匀采样，pbrt4 中使用了论文 A Low Distortion Map Between Disk and Square 中的方法，相比于根据 inversion method 算出来的映射，这种方法 distortion 更少。pbrt4 中对应的函数为 `SampleUniformDiskConcentric`
+为了在 disk 上均匀采样，pbrt4 中使用了论文 A Low Distortion Map Between Disk and Square 中的方法，相比于根据 inversion method 算出来的映射，这种方法 distortion 更少。pbrt4 中对应的函数为 `SampleUniformDiskConcentric`。论文中进一步讨论了如何将 uniform sampled disk 转换为 uniform sampled hemisphere
+
+论文 [Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD](https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf) 将这种方法推广到了 sphere 上去。想法就是在 [Octahedral Mapping](https://www.pbr-book.org/4ed/Geometry_and_Transformations/Spherical_Geometry#x3-OctahedralEncoding) 中，一个大正方形由两个小正方形拼出来，每个小正方形对应一个半球，而每个小正方形上可以均匀采样，得到半球上的均匀采样，汇总就得到了球上的均匀采样。代码中巧妙地使用绝对值避免分支挺有意思的。它对应 pbrt4 中的 `EqualAreaSquareToSphere` 函数
 
 在 pbrt4 的 A.5.3 中谈到了 Cosine-Weighted Hemisphere Sampling，即采样概率与平面法线夹角成正比，这个对应的实现是 `SampleCosineHemisphere` 函数。它利用 _Malley’s method_ 取巧地实现了（即发现半球上的面积在平面圆上的投影面积大小正好与余弦值成正比）
 
