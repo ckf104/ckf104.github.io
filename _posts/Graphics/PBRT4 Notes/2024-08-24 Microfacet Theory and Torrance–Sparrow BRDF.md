@@ -135,3 +135,11 @@ $$
 ## Trowbridge-Reitz Distribution
 
 TODO：这个 D，G 函数的来历和推导还没弄懂，然后能否按照书上说的那样，投影到一个纵向压扁的圆上采样呢。因为椭圆是凸的，又哪来的 Shadowing 效果呢
+
+TODO:
+$$
+f_s(p,w_i,w_o) = k_d\frac{c}{\pi} + k_s\frac{F(w_o\cdot w_m)D(w_m)G(w_i, w_o,w_m)}{4 cos\theta_o cos\theta_i}
+$$
+LearnOpenGL 上使用的微表面是这个，$k_d,k_s$ 是哪来的
+
+TODO：解释为什么金属没有漫反射项
