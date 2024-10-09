@@ -2,7 +2,7 @@
 * heterogeneous  --> $\sigma_a$ 等参数依赖于位置
 * chromatic --> $\sigma_a$ 等参数依赖于波长
 
-Ray Marching 处理 single scattering
+[cse168 Volumetric Scattering](https://cseweb.ucsd.edu/classes/sp17/cse168-a/CSE168_14_Volumetric.pdf) 讲得很好，讨论了 Single/Multiple Scattering 的定义，Ray Marching 是一种考虑 Single Scattering 的方法
 
 ## Simple Volumetric Integrator
 

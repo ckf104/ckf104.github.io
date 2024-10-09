@@ -1,4 +1,4 @@
-	## Solid Angle
+## Solid Angle
 
 总结一下立体角，主要参考 [立体角とガウスの発散定理](https://hooktail.sub.jp/vectoranalysis/GaussSolidAngle/)
 
@@ -32,58 +32,16 @@ $$
 $$
 L(p,w) = \int_{\lambda_1}^{\lambda_2}L(p,w,\lambda)d\lambda
 $$
+## 从辐射度量到人眼亮度
 
-### 从辐射度量到人眼亮度
-
-TODO：增加 $V(\lambda)$ 的描述，它是连接辐射度和亮度的桥梁
+TODO：增加 $V(\lambda)$ 的描述，它是连接辐射度和亮度的桥梁，在 CIE 1931（XYZ color space）中，它是匹配函数 $Y(\lambda)$。虽然 pbrt4 4.6.1 节中讲到 $V(\lambda)=638Y(\lambda)$，但在 wiki 上谈到的 $V(\lambda)$ 是最大值归一化后的函数了，所以我这里说的是 $V(\lambda)=Y(\lambda)$
 
 candela（cd）是发光强度的单位，luminous flux （cd sr）表示光通量，luminance（cd / m^2） 表示**单位投影面积**的发光强度
 
-[table 4.2](https://www.pbr-book.org/4ed/Radiometry,_Spectra,_and_Color/Radiometry#table:radiometric-photometric) 中记录了辐射度单位和亮度单位的对应关系
+TODO：解释三个二维的归一化后的xy坐标+一个白光的xyz坐标能够确定一个色彩空间
 
-TODO：rgb 表示如何对于到 illuminance？
-
-TODO：亮度函数 $V(\lambda)$ 和 CMF 的关系是什么
+TODO：pixel sensor 中的白平衡
 
 [色彩空间基础](https://zhuanlan.zhihu.com/p/24214731)
 
 [color matching function](https://zhajiman.github.io/post/color_matching_function/)
-
-## 在代码中表达材质
-
-目前 4.5 节是在记录每个材质对于不同波长的光的反射率，我理解这里反射率 x 的含义是指，输入 1W 的功率，会反射 xW 的功率出去（还没考虑方向的问题的）
-
-TODO：关注 RGB 开头的那几个 Spectrum，例如 RGBAlbedoSpectrum
-
-## Dielectric BxDF
-
-还没有特别理解 9.5 节中讨论的绝缘体 BxDF 采样，它以 fresnel 计算出的反射率作为采样折射还是反射光线的概率。声称这样会被均匀采样更好。
-
-~~我不理解的地方在于，既然已经知道折射光线和反射光线的比例，显然应该以这个比例进行采样呀，为什么还可以均匀采样呢？~~
-这个比例是用来决定渲染方程中 $f_r(p,w_o.w_i)$ 的值的，和如何采样没有关系！
-
-## Non-Symmetric BTDF
-
-通常我们认为 BRDF 是具有对称性的，即 $f_r(p,w_o,w_i) = f_r(p,w_i,w_o)$ 。但在 9.5.2 节谈到了 BTDF 不具有这样的对称性，根源在于当光线从折射率小的介质进入到折射率大的介质时，它的立体角被压缩了。由此得到
-$$
-\eta_0^2f_t(p,w_o,w_i)=\eta_i^2f_t(p,w_i,w_o)
-$$
-TODO：为什么 BRDF 具有对称性
-TODO：上面的等式根据 $f_t$ 的定义是可以推导出来的，~~但是从直觉上（或者在利用 delta 函数），我觉得应该是 $\eta^4$ 呢?~~
-
-好吧，就算用 delta 函数的形式
-$$
-f_t(p,w_i,w_t) = \frac{\delta(w_i-w_{t_r})}{cos\theta_{t_r}}\frac{\eta_t^2}{\eta_i^2}
-$$
-首先还有一个额外的余弦比值项，然后这俩 delta 函数的比也不能直接消除，因此 $\eta^4$ 确实没有什么道理
-
-TODO: 为什么在 TransportMode::importance 时不再考虑 $\frac{\eta_t^2}{\eta_i^2}$ 这个 factor 了，感觉和 bidirectional light transport algorithms 有些关系？
-
-## Microfacet BRDF
-
-论文 Microfacet Models for Refraction through Rough Surfaces 提出了 GGX 分布
-
-法线分布函数（Normal Distribution Function）D(w) 是单位面积，单位立体角中对应的法线为 w 的面积大小。即 D(w)dwdA 表示在微小 dA 面积中，法线为 w 的面积的大小。因此 D(w)dw 反映了一个面积比例关系，有
-$$
-\int D(w)cos\theta_wdw = 1
-$$
