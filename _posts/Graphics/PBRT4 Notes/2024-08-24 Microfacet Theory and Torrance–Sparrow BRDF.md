@@ -25,7 +25,7 @@ $$
 因为 Interreflection 不好建模，我们忽略这部分情况（这会导致结果偏暗？）
 
 为了刻画微表面间的遮挡关系，我们引入 $0 \leq G(w_i, w_m) \leq 1$，它表征了法线为 $w_m$ 的微表面在入射方向 $w_i$ 下的有效面积，因此
-$$
+$$ \tag{1}
 \int_{H^2(n)} D(w_m)G(w_i,w_m)max(0, w_m\cdot w_i)dw_m = w_i\cdot n = cos\theta_i
 $$
 现在我们对分布函数
@@ -33,6 +33,8 @@ $$
 D_{w_i}(w_m) = \frac{D(w_m)G(w_i,w_m)max(0,w_m\cdot w_i)}{cos\theta_i}
 $$
 进行采样（Visible normal sampling），就能够得到有效的法线了
+##### Note
+这里的 $G(w_i, w_m)$ 以及后面引入的 $G(\mathbf{i}, \mathbf{o}, \mathbf{m})$ 都表示可见面积的比例，它小于 1 的原因除了因为自遮挡之外，还可能是因为 macro face 的投影。例如我们考虑宏表面和微表面构成的这样一个三角形 $\Delta$，取 $w_i,w_m$ 都为左侧斜坡的法线，根据 $(1)$ 式，此时应有 $G(w_i, w_m)$ 的值为底边在左侧斜边上的投影比上左侧斜边长。此时 $G(w_i, w_m) < 1$ 的原因在于，从宏表面上看，光线打在左侧斜边偏上的部分，根本就不会落到宏表面上
 ## Torrance–Sparrow BRDF
 
 有了微表面的法线分布之后，并结合镜面反射的假设。我们可以反推出材质的 brdf
