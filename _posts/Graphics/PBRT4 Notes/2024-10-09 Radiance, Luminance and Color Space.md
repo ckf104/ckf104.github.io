@@ -40,8 +40,14 @@ candela（cd）是发光强度的单位，luminous flux （cd sr）表示光通�
 
 TODO：解释三个二维的归一化后的xy坐标+一个白光的xyz坐标能够确定一个色彩空间
 
-TODO：pixel sensor 中的白平衡
+从 [color matching function](https://zhajiman.github.io/post/color_matching_function/) 最大的 takeaway 是区分 color matching function 和 light emission function，前者积分的结果决定发出的光线中后者的份数，我觉得 pbrt4 中没有很好地区分两者，(4.24) 的推导是有些问题的，虽然后面的 RGB color space 的部分没啥问题
+
+TODO：pixel sensor 中的白平衡，对于 xyz 色彩空间的白平衡，根据 [LMS color space](https://en.wikipedia.org/wiki/LMS_color_space) 中说的，Bradford，CAT02, CAT16 等转换就是将颜色从 xyz 空间转到 lms 空间。pbrt4 中用的是 Bradford 转换矩阵。pbrt4 中在进行 von Kries transform 之前先对 xyz 坐标的 Y 值进行了归一化处理，来保证 lightness 不参与
+
+我不太理解的地方有两点：
+* 为啥 target 是 output color space 的白色而不是 LMS color space 的白色（但这我觉得几乎没有差别吧，毕竟白色的定义基本都差不多，例如许多色彩空间都用 D65 来定义白色）
+* 为什么会有不同的从 xyz 到 lms 的转换矩阵，按道理来说应该是固定的一个色彩空间转换矩阵？
+
+[Standard illuminant](https://en.wikipedia.org/wiki/Standard_illuminant) 解释了 pbrt4 中 `Spectra::D` 函数从哪来的
 
 [色彩空间基础](https://zhuanlan.zhihu.com/p/24214731)
-
-[color matching function](https://zhajiman.github.io/post/color_matching_function/)
