@@ -48,6 +48,11 @@ TODO：pixel sensor 中的白平衡，对于 xyz 色彩空间的白平衡，根�
 * 为啥 target 是 output color space 的白色而不是 LMS color space 的白色（但这我觉得几乎没有差别吧，毕竟白色的定义基本都差不多，例如许多色彩空间都用 D65 来定义白色）
 * 为什么会有不同的从 xyz 到 lms 的转换矩阵，按道理来说应该是固定的一个色彩空间转换矩阵？
 
+color chart 与 white balance adjustment，三个核心问题
+* 有了 color chart 后，算法具体如何工作？pbrt 中采取的方式是找到一个矩阵，使得它将当下场景中白平衡光源照射 color chart 得到的颜色映射为标准白光照射 color chart 得到的颜色
+* 为什么在 xyz 空间的构造函数不使用这个方法，而是使用 von Kries transform？
+* 为什么 sensor 到 xyz 的色彩空间转换不采用矩阵的方式，而是定义了一个优化目标？
+
 [Standard illuminant](https://en.wikipedia.org/wiki/Standard_illuminant) 解释了 pbrt4 中 `Spectra::D` 函数从哪来的
 
 [色彩空间基础](https://zhuanlan.zhihu.com/p/24214731)
