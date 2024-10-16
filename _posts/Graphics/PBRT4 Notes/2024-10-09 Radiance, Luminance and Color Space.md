@@ -76,4 +76,12 @@ TODO：如何用 OpenGL 渲染 HDR 图像，我看网上的做法基本都是使
 TODO：png vs openExr，显示器参数中的亮度和对比度与色彩空间的关系是什么，它与 hdr, sdr 的关系是什么？静态对比度和动态对比度有什么区别
 显示器的 gamma 值应该如何设置，它和 gamma 矫正的关系是什么
 
+TODO：全局调光，局部调光（Local Dimming），什么是
+TODO：HDR10，HDR10+ 的区别，以及 DisplayHDR400，DisplayHDR600 等的区别。根据 [Whats the difference between HDR10, HDR10+ HDR400, HDR600](https://www.reddit.com/r/Monitors/comments/hwdwtf/whats_the_difference_between_hdr10_hdr10_hdr400/), [Summary of DisplayHDR Specs under CTS 1.2](https://displayhdr.org/performance-criteria/)，DisplayHDR400，DisplayHDR600 是性能测试通过的一种认证，而 HDR10, HDR10+ 更多地是一种 HDR 数据的通信协议（例如从 GPU 到显示器）。最高的 DisplayHDR1400 要求 50000 的静态对比度，但实际上颜色深度只有 10bits，直觉上对比度至多达到 1024？还是说这里存在一个 tone mapping，有一个非线性的映射？
+
+
+ TODO：[GL_DITHER 抖动算法](https://blog.csdn.net/GrimRaider/article/details/7449278) 对 dithering 的讲解挺好的，将 dithering 理解为是一个将 color bits 更多的图像转化为 color bits 更少的图像的算法比较好
+TODO：显示器的 gamma 值设置，看看 pbrt4 的 LinearTOSRGB 函数实现
+
+
 显示器设置中的色调，饱和度，亮度，对比度，色温等我觉得就理解为后处理的操作就行了
