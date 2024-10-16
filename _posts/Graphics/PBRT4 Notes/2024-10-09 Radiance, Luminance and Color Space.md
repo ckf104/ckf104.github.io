@@ -56,3 +56,24 @@ color chart 与 white balance adjustment，三个核心问题
 [Standard illuminant](https://en.wikipedia.org/wiki/Standard_illuminant) 解释了 pbrt4 中 `Spectra::D` 函数从哪来的
 
 [色彩空间基础](https://zhuanlan.zhihu.com/p/24214731)
+
+
+
+
+
+
+然后我们来讨论 pbrt4 的输出文件与显示器参数
+首先是显示器能显示的颜色范围：例如通常说的 99% sRGB，我认为就是显示器能显示的颜色覆盖到色品图上的 99% 的 sRGB 范围。而 8bit, 10bit 的颜色比特数主要与覆盖面积中的点的密度相关
+
+然后上面这些只是色调（对应色品图上 x+y+z=1 这个平面），显示器参数中的亮度和对比度就表征了它能表示多亮和多暗的颜色。我猜测亮度中的 250cd/m^2 之类的应该是最大亮度吧。对比度的话有动态对比度（dynamic contrast ratio）和静态对比度（static contrast ratio）。根据 [Dynamic Contrast Ratio vs Static Contrast Ratio](https://www.reddit.com/r/AskReddit/comments/trqr7/dynamic_contrast_ratio_vs_static_contrast_ratio/)，静态对比度是指在同一帧中，最亮和最暗的像素的比值。而动态对比度是不限制在同一帧
+
+>Dynamic contrasting works by lowering the power of the backlight on the TV making the whole image darker but simultaneously amplifying the few pixels which should be coloured/bright. This means it can adjust based on how dark the overall image is allowing you to see dark scenes better. But, the limit on how well you can see those scenes is the static contrast ratio; the system obviously can't do any better than this.
+
+例如一些显示器会有开启/关闭动态对比度的选项，就是干这个事情的
+
+下一个是 HDR，
+TODO：如何用 OpenGL 渲染 HDR 图像，我看网上的做法基本都是使用 float framebuffer + tone mapping，感觉这里完全没用到显示器 HDR 的功能呢
+TODO：png vs openExr，显示器参数中的亮度和对比度与色彩空间的关系是什么，它与 hdr, sdr 的关系是什么？静态对比度和动态对比度有什么区别
+显示器的 gamma 值应该如何设置，它和 gamma 矫正的关系是什么
+
+显示器设置中的色调，饱和度，亮度，对比度，色温等我觉得就理解为后处理的操作就行了
