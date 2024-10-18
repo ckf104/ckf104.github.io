@@ -32,15 +32,25 @@ $$
 $$
 L(p,w) = \int_{\lambda_1}^{\lambda_2}L(p,w,\lambda)d\lambda
 $$
+## 色彩空间
+
+从 [color matching function](https://zhajiman.github.io/post/color_matching_function/) 最大的 takeaway 是区分 color matching function 和 light emission function，前者积分的结果决定发出的光线中后者的份数。在 light emission function 确定后，通过实验测量能够获得它对应的 color matching function。我觉得 pbrt4 中没有很好地区分两者，(4.24) 的推导是有些问题的，虽然后面的 RGB color space 的部分没啥问题。我觉得 (4.24) 更正确的写法应该是
+$$
+\displaylines{
+x = \int X(\lambda)S(\lambda)d\lambda \approx \int X(\lambda)(rR_e(\lambda)+gG_e(\lambda)+bB_e(\lambda))d\lambda
+\\
+=r\int X(\lambda)R_e(\lambda)d\lambda+g\int X(\lambda)G_e(\lambda)d\lambda+b\int X(\lambda)B_e(\lambda)d\lambda
+}
+$$由此我们得到
+$$
+\left[\begin{array}{l}x \\ y \\ z\end{array}\right]=\left(\begin{array}{lll}\int R_e(\lambda) X(\lambda) \mathrm{d} \lambda & \int G_e(\lambda) X(\lambda) \mathrm{d} \lambda & \int B_e(\lambda) X(\lambda) \mathrm{d} \lambda \\ \int R_e(\lambda) Y(\lambda) \mathrm{d} \lambda & \int G_e(\lambda) Y(\lambda) \mathrm{d} \lambda & \int B_e(\lambda) Y(\lambda) \mathrm{d} \lambda \\ \int R_e(\lambda) Z(\lambda) \mathrm{d} \lambda & \int G_e(\lambda) Z(\lambda) \mathrm{d} \lambda & \int B_e(\lambda) Z(\lambda) \mathrm{d} \lambda\end{array}\right)\left[\begin{array}{l}r \\ g \\ b\end{array}\right]
+$$
+这里的 $R_e,G_e,B_e$ 是这个 RGB 色彩空间的 light emission function
 ## 从辐射度量到人眼亮度
-
-TODO：增加 $V(\lambda)$ 的描述，它是连接辐射度和亮度的桥梁，在 CIE 1931（XYZ color space）中，它是匹配函数 $Y(\lambda)$。虽然 pbrt4 4.6.1 节中讲到 $V(\lambda)=638Y(\lambda)$，但在 wiki 上谈到的 $V(\lambda)$ 是最大值归一化后的函数了，所以我这里说的是 $V(\lambda)=Y(\lambda)$
-
-candela（cd）是发光强度的单位，luminous flux （cd sr）表示光通量，luminance（cd / m^2） 表示**单位投影面积**的发光强度
-
-TODO：解释三个二维的归一化后的xy坐标+一个白光的xyz坐标能够确定一个色彩空间
-
-从 [color matching function](https://zhajiman.github.io/post/color_matching_function/) 最大的 takeaway 是区分 color matching function 和 light emission function，前者积分的结果决定发出的光线中后者的份数，我觉得 pbrt4 中没有很好地区分两者，(4.24) 的推导是有些问题的，虽然后面的 RGB color space 的部分没啥问题
+我们可以把颜色拆分成两部分，一部分是色相，表示颜色本身，另一部分是亮度，表示颜色的明亮程度。人们通过实验得到了[亮度函数](https://en.wikipedia.org/wiki/Luminous_efficiency_function)，下面的公式建立了辐射通量到光通量的桥梁$$
+\Phi_{\mathrm{v}}=683.002(\operatorname{lm} / \mathrm{W}) \cdot \int_0^{\infty} \bar{y}(\lambda) \Phi_{\mathrm{e}, \lambda}(\lambda) \mathrm{d} \lambda
+$$其中 $\bar{y}(\lambda)$ 就是亮度函数。它的函数最大值被归一化到 1。在 CIE 1931（XYZ color space）中作为匹配函数 $Y(\lambda)$。因此对于颜色我们通常有两种表示方式，一种是 xyz 形式，表示该颜色在 XYZ 色彩空间的坐标。另一种是 xyY 形式，这里的 xy 对应原来的 xyz 坐标归一化到 $x+y+z=1$ 的平面后的 xy 坐标，对应色相，而这里的 Y 表示原来的 y 坐标，对应亮度
+## 白平衡
 
 TODO：pixel sensor 中的白平衡，对于 xyz 色彩空间的白平衡，根据 [LMS color space](https://en.wikipedia.org/wiki/LMS_color_space) 中说的，Bradford，CAT02, CAT16 等转换就是将颜色从 xyz 空间转到 lms 空间。pbrt4 中用的是 Bradford 转换矩阵。pbrt4 中在进行 von Kries transform 之前先对 xyz 坐标的 Y 值进行了归一化处理，来保证 lightness 不参与
 
@@ -55,33 +65,46 @@ color chart 与 white balance adjustment，三个核心问题
 
 [Standard illuminant](https://en.wikipedia.org/wiki/Standard_illuminant) 解释了 pbrt4 中 `Spectra::D` 函数从哪来的
 
-[色彩空间基础](https://zhuanlan.zhihu.com/p/24214731)
+TODO：有必要看看 UE 后处理中白平衡的实现
+## 显示器相关
 
+现在我们应用对色彩空间的理解看看显示器的各项参数
 
-
-
-
-
-然后我们来讨论 pbrt4 的输出文件与显示器参数
 首先是显示器能显示的颜色范围：例如通常说的 99% sRGB，我认为就是显示器能显示的颜色覆盖到色品图上的 99% 的 sRGB 范围。而 8bit, 10bit 的颜色比特数主要与覆盖面积中的点的密度相关
 
 然后上面这些只是色调（对应色品图上 x+y+z=1 这个平面），显示器参数中的亮度和对比度就表征了它能表示多亮和多暗的颜色。我猜测亮度中的 250cd/m^2 之类的应该是最大亮度吧。对比度的话有动态对比度（dynamic contrast ratio）和静态对比度（static contrast ratio）。根据 [Dynamic Contrast Ratio vs Static Contrast Ratio](https://www.reddit.com/r/AskReddit/comments/trqr7/dynamic_contrast_ratio_vs_static_contrast_ratio/)，静态对比度是指在同一帧中，最亮和最暗的像素的比值。而动态对比度是不限制在同一帧
 
 >Dynamic contrasting works by lowering the power of the backlight on the TV making the whole image darker but simultaneously amplifying the few pixels which should be coloured/bright. This means it can adjust based on how dark the overall image is allowing you to see dark scenes better. But, the limit on how well you can see those scenes is the static contrast ratio; the system obviously can't do any better than this.
 
-例如一些显示器会有开启/关闭动态对比度的选项，就是干这个事情的
+这种提升动态对比度的技术是全局调光，例如一些显示器会有开启/关闭动态对比度的选项。另外一种能提升静态对比度是局部调光（Local Dimming）
+#### Gamma Correction
+然后我们来讨论一下 gamma 校正，[What and Why is Gamma Correction in Photo Images?](https://www.scantips.com/lights/gamma2.html) 挺有意思，作者反复强调了 gamma 校正和与人眼对暗处的变化更敏感这件事是无关的，虽然我觉得还是有些关系就是了
 
-下一个是 HDR，
-TODO：如何用 OpenGL 渲染 HDR 图像，我看网上的做法基本都是使用 float framebuffer + tone mapping，感觉这里完全没用到显示器 HDR 的功能呢
-TODO：png vs openExr，显示器参数中的亮度和对比度与色彩空间的关系是什么，它与 hdr, sdr 的关系是什么？静态对比度和动态对比度有什么区别
-显示器的 gamma 值应该如何设置，它和 gamma 矫正的关系是什么
+总的来说，现在还要做 gamma 校正主要是因为历史原因，因为 CRT 的非线性，所以数据先乘以 1/2.2 的幂次后再传给显像设备。虽然细想稍微有一些奇怪，因为为啥这一层不在 CRT 设备里面做呢，这样就把非线性的事情给对外屏蔽掉了，可能的解释是早期的设备做这种事比较费吧，还是让计算机提前做了比较好。但现在的显示设备已经是线性的了，所以现在的显示器会将收到的非线性的 sRGB 值又转回线性的 sRGB 值再进行显示（例如许多显示器可以设置进行 gamma 校正的指数大小）
 
-TODO：全局调光，局部调光（Local Dimming），什么是
-TODO：HDR10，HDR10+ 的区别，以及 DisplayHDR400，DisplayHDR600 等的区别。根据 [Whats the difference between HDR10, HDR10+ HDR400, HDR600](https://www.reddit.com/r/Monitors/comments/hwdwtf/whats_the_difference_between_hdr10_hdr10_hdr400/), [Summary of DisplayHDR Specs under CTS 1.2](https://displayhdr.org/performance-criteria/)，DisplayHDR400，DisplayHDR600 是性能测试通过的一种认证，而 HDR10, HDR10+ 更多地是一种 HDR 数据的通信协议（例如从 GPU 到显示器）。最高的 DisplayHDR1400 要求 50000 的静态对比度，但实际上颜色深度只有 10bits，直觉上对比度至多达到 1024？还是说这里存在一个 tone mapping，有一个非线性的映射？
+另外一个理由是人眼对亮度的敏感度的非线性。虽然作者反复强调和这个没有关系，但他假设的前提是传输的 bit depth 和显示的 bit depth 相同。例如我们假设传输和显示的 bit depth 都是 8 bits，那来回 gamma 校正确实没啥用。但如果传输的是 8 bits，而显示的是 10 bits，就不一样了，因为乘以 2.2 次方颜色普遍变小了，因此更多的颜色落在了暗处的位置，我们更好地利用了暗处位置的编码空间。一个相似的逻辑是在 OpenGL 中使用 sRGB 纹理，因为采样的结果会转为 32 bits 的浮点参与 shader 的计算，因此我们的 8bits 编码为偏暗的颜色保留了更高的精度
 
+OpenGL 中与 sRGB 相关的有两处，一个是刚刚提到的 sRGB 纹理，在这种情况下对纹理采样时首先会将储存的非线性空间值转到线性空间再传递给 shader。另外是 framebuffer 的 color attachment，如果我们使用 `glEnable(GL_FRAMEBUFFER_SRGB)`，那么 OpenGL 会假设 shader 写入的结果是线性的，它会做 gamma 校正转到非线性然后再存到 render target 中。默认情况下这个是不开启的，意味着需要我们自己在 shader 中手动做 gamma 校正
 
- TODO：[GL_DITHER 抖动算法](https://blog.csdn.net/GrimRaider/article/details/7449278) 对 dithering 的讲解挺好的，将 dithering 理解为是一个将 color bits 更多的图像转化为 color bits 更少的图像的算法比较好
-TODO：显示器的 gamma 值设置，看看 pbrt4 的 LinearTOSRGB 函数实现
+类似地，在 pbrt4 中，如果生成图片的格式是 png 的话，它也需要将 integrator 计算出的线性颜色进行 gamma 校正，因为 png 文件中存储的是非线性的 sRGB 值。gamma 校正的实现见 `src/pbrt/util/color.h` 中的 `LinearToSRGB` 函数
+#### HDR
+然后是 HDR 相关的概念，参考了一下
+* [reddit: Whats the difference between HDR10, HDR10+ HDR400, HDR600?](https://www.reddit.com/r/Monitors/comments/hwdwtf/whats_the_difference_between_hdr10_hdr10_hdr400/)
+* [不严谨的HDR科普：十分钟弄懂HDR显示和HDR调色](https://zhuanlan.zhihu.com/p/348100007)
+* [HDR学习笔记（一）：动态范围与传递函数](https://zhuanlan.zhihu.com/p/624292553)
+总的来说，HDR10 以及 HDR10+ 是针对 HDR 内容的通信协议，而 DisplayHDR400，DisplayHDR600 等是 VESA 制定了显示器性能的认证，包含了静态对比度，最大亮度，色域等的要求。具体的各项要求可以查看 [Summary of DisplayHDR Specs under CTS 1.2](https://displayhdr.org/performance-criteria/)
 
+[不严谨的HDR科普：十分钟弄懂HDR显示和HDR调色](https://zhuanlan.zhihu.com/p/348100007) 中描述 color bits depth 和动态范围（dynamic range）的关系时做的比喻非常巧妙。我们想象一把尺子，动态范围就对应尺子的长度，而 color bits depth 就对应尺子的刻度。color bits 越多，尺子上的刻度就越密集，颜色的过渡就更平滑。color bits depth 不变时动态范围越大，尺子上各个刻度的间隔就越大。自然界场景的亮度分布非常广泛，但显示器没办法表示这么宽泛的亮度范围，将自然界的亮度范围调制到显示器的亮度范围的过程就是所谓的 tone mapping
 
-显示器设置中的色调，饱和度，亮度，对比度，色温等我觉得就理解为后处理的操作就行了
+在 OpenGL 渲染中，所谓的 HDR 工作流通常是使用一个 float16 精度的 framebuffer，这使得 shader 的输出颜色能够超过 1，然后再利用 tone mapping 将颜色又压缩回 1，最后做一个 gamma 校正，再把结果传递给显示器。这里的 tone mapping 通常会有一个曝光参数（感觉是从摄影里来的一个概念），一个低的曝光参数意味着它对明亮区域更加友好，输出的结果能较好地显示明亮区域的细节。而高曝光参数则更好地显示黑暗区域的细节
+
+TODO：上面的表述还是有些模糊，主要我也不理解细节。要进一步理解需要回答下面两个问题：
+
+第一个问题是显示器是如何看待收到的 8/10bits 三元 RGB 组，这个又如何转化为屏幕亮度呢？首先，每个显示器的色调，饱和度，亮度，对比度，色温等可以设置。那大概的流程应该要做一个 gamma 校正的逆变换，然后再根据此时显示器的设置将每个 sRGB 值映射到一个亮度上（这可以看作是 tone mapping 的逆变换）。在 SDR 流程中，在渲染阶段的 tone mapping 和显示器内部做的 tone mapping 的逆变换并没有一个约定。但在 HDR 流程中，显然是需要一个约定才能发挥 HDR 的效果的。根据 [HDR学习笔记（一）：动态范围与传递函数](https://zhuanlan.zhihu.com/p/624292553) 中的解释，这里有一个光电转换函数，电光转换函数的概念，前者将线性的光照编码到 0 到 1 的非线性的空间，而后者是逆变换，将其还原为原始的线性光照。对于 SDR，我们可以认为 gamma 校正的函数就是光电转换函数。而在 HDR10 协议中，使用 [PQ](https://en.wikipedia.org/wiki/Perceptual_quantizer) 函数作为光电转换函数，从 PQ 函数的定义我们也可以理解为什么说 HDR10 最高支持 10000 nit 的亮度
+
+这也可以解释为什么 DisplayHDR600 的静态对比度要求是 8000。套用之前的比喻，如果尺子上的刻度间隔是线性的话，10 bits 的 color bits depth 最多只能表现出 1024 的静态对比度，但光电转换函数是一个非线性的函数，因此尺子上的刻度随着值的增大是越来越稀疏的
+
+第二个问题是 HDR 内容是什么，HDR10 协议规定了些什么，GPU 和显示器通信除了传递 8/10bits 的三元 RGB 之外还需要传递其它什么东西吗。有关 HDR10 协议的细节有必要参考一下 [High-dynamic-range television](https://en.m.wikipedia.org/wiki/High-dynamic-range_television)
+
+#### Dithering
+ 最后我们讨论 dithering 这个概念，[GL_DITHER 抖动算法](https://blog.csdn.net/GrimRaider/article/details/7449278) 讲得很好，可以将 dithering 理解为是一个将 color bits 更多的图像转化为 color bits 更少的图像的算法比较好。它的核心想法就是人眼会自动地对颜色进行融合，例如颜色 1 和 3 在远处看就融合成 2 了。这就能解释常见的 6 抖 8，8 抖 10 的概念了。例如 6 抖 8 我认为就是显卡发送的是 8 bits 数据，然后显示器这边只能做 6 bits 显示，就通过 dithering 算法，将 8 bits 的颜色抖为 6 bits 颜色（不太确定 dithering 应该发生在显卡侧还是 显示器侧）
