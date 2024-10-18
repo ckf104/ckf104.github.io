@@ -1,9 +1,22 @@
 系统的复杂度主要来源于两点
 * heterogeneous  --> $\sigma_a$ 等参数依赖于位置
 * chromatic --> $\sigma_a$ 等参数依赖于波长
+## Ray Marching
 
-[cse168 Volumetric Scattering](https://cseweb.ucsd.edu/classes/sp17/cse168-a/CSE168_14_Volumetric.pdf) 讲得很好，讨论了 Single/Multiple Scattering 的定义，Ray Marching 是一种考虑 Single Scattering 的方法
+[An Introduction to Volume Rendering](https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/intro-volume-rendering.html) 对 ray marching 的介绍挺好的，并给出了渲染方程怎么从微分形式到积分形式的详细推导。它的基本想法就是，将渲染方程中的积分转换为黎曼和（ray marching 就是求这个黎曼和的形象化表述）。对于 in scattering 的贡献，它就做了简化，只考虑一次 scattering 的路径，不考虑多次 scattering 的路径对结果的贡献
 
+这样的话，我们要计算从 w 方向，到达 A 点的 radiance，就从 A 点出发，沿着 -w 方向行进光线，每前进 dt 长度，我们要
+* 计算一次黎曼和（这个对应 $L_e$，也就是自发光项的贡献）
+* 在当前位置采样一个 in scattering 方向，如果这个方向能击中光源，沿着这个采样的方向又做 ray marching（求黎曼和），然后计算这条 in scattering 光路对结果的贡献（这里要求能击中光源也是出于只有一次 scattering 的简化，如果考虑各个方向反射过来的环境光的话，追踪一条光线就分裂出了追踪多条光线，path tracing 就没法做了）
+直到前进 dt 长度光线离开了这个 participating media，那就正常往前继续做路径追踪即可（细想一下这里我觉得稍微有些别扭，如果使用路径追踪的话，这里光源 in-scattering 的贡献属于什么路径呢？）
+## Ratio Tracking and Null Scattering
+
+TODO：解释公式 (11.13) 的推导
+## General Solution of Rendering Equation with Participating Media
+
+这里我想直观地解释一下 14.1.4 节中渲染方程解的形式。13.1.4 节中的给出的渲染方程解没有考虑到渲染方程解，但这个解没有考虑 participating media。14.1.4，14.1.5 节做的事情就是把这个结果泛化到存在 participating media 的情况。我们先回顾一下原本的渲染方程，
+
+TODO：解释 14.1.4，14.1.5 中渲染方程解的含义
 ## Simple Volumetric Integrator
 
 ## Improved Volumetric Integrator
@@ -12,6 +25,7 @@
 * 支持 surface scattering
 * 使用 MIS 面向光源采样
 * 处理 $\sigma_a, \sigma_s$ 随波长变化的情况
+
 
 TODO：
 * 这个采样的路径长度是否要考虑 null scattering，我感觉面向光源采样的时候得到的路径上可能有多个 null scatter，路径长度不太对？
