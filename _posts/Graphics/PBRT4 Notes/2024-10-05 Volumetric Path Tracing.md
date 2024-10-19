@@ -14,8 +14,17 @@
 TODO：解释公式 (11.13) 的推导
 ## General Solution of Rendering Equation with Participating Media
 
-这里我想直观地解释一下 14.1.4 节中渲染方程解的形式。13.1.4 节中的给出的渲染方程解没有考虑到渲染方程解，但这个解没有考虑 participating media。14.1.4，14.1.5 节做的事情就是把这个结果泛化到存在 participating media 的情况。我们先回顾一下原本的渲染方程，
+这里我想直观地解释一下 14.1.4 节中渲染方程解的形式。13.1.4 节中的给出的渲染方程解没有考虑到渲染方程解，但这个解没有考虑 participating media。14.1.4，14.1.5 节做的事情就是把这个结果泛化到存在 participating media 的情况。我们先回顾一下原本三点式的，只考虑表面反射，折射的渲染方程
+$$
+\begin{equation}
+L\left(\mathrm{p}^{\prime} \rightarrow \mathrm{p}\right)=L_{\mathrm{e}}\left(\mathrm{p}^{\prime} \rightarrow \mathrm{p}\right)+\int_A f\left(\mathrm{p}^{\prime \prime} \rightarrow \mathrm{p}^{\prime} \rightarrow \mathrm{p}\right) L\left(\mathrm{p}^{\prime \prime} \rightarrow \mathrm{p}^{\prime}\right) G\left(\mathrm{p}^{\prime \prime} \leftrightarrow \mathrm{p}^{\prime}\right) \mathrm{d} A\left(\mathrm{p}^{\prime \prime}\right)
+\end{equation}
+$$
+在 13.1.4 节中，我们反复迭代上式，拿到了这个渲染方程的解。现在除了上面的渲染方程，还额外加入了体渲染方程（推导见 [From the Radiative Transfer Equation to the Volume Rendering Equation](https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/volume-rendering-summary-equations.html)，这里形式和它有些不一样的原因在于我们使用了 null scattering 技巧）
+$$
 
+$$
+[From the Radiative Transfer Equation to the Volume Rendering Equation](https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/volume-rendering-summary-equations.html)
 TODO：解释 14.1.4，14.1.5 中渲染方程解的含义
 ## Simple Volumetric Integrator
 
