@@ -59,6 +59,12 @@ $$
 * 使用 MIS 面向光源采样
 * 处理 $\sigma_a, \sigma_s$ 随波长变化的情况
 
+整个算法的复杂度来源于两个地方，一个是对于 heterogeneous media，它的 $\sigma_a,\sigma_s$ 等参数的值依赖于空间位置。另一个是对于 chromatic media，它的  $\sigma_a,\sigma_s$ 等参数的值还依赖于波长，这会对采样产生影响
+
+我们首先讨论 heterogeneous media 的处理。pbrt4 中使用 null scattering 的技术，额外引入了 $\sigma_n \ge 0$，使得 $\sigma_t + \sigma_n = \sigma_{maj}$ 不再依赖于空间位置（但可以依赖于波长）。但显然 $\sigma_{maj}$ 越小，对应采样到 null scattering 的概率越小，采样效率越高。因此在 11.4 节的 `GridMedium` 实现中会把 participating media 划分为若干小立方体，在每个小立方体内计算一个更紧的 $\sigma_{maj}$ 估计。现在 $\sigma_{maj}$ 变为了一个分段常量，我们如何使用 delta tracking 进行采样呢？
+
+需要明确的是，我们要做的只是按照某种概率分布采样路径，使用不同的概率分布采样路径只会影响方差大小，而不会影响无偏性。当 $\sigma_{maj}$ 是常量时，我们采样用的概率分布是 $p(t) = \sigma_{maj}e^{-\sigma_{maj}t}$，这是预期这个指数概率分布刚好抵消掉体渲染方程中的指数衰减项，使得最后的方差较小。而现在 $\sigma_{maj}$ 变为了一个分段常量。一个很自然的想法采样想法就是，我先用当前所在的小立方体的 $\sigma_{maj}$ 作指数概率分布的采样，如果采样出来的 $t$ 值仍在小立方体内，我们就将其作为得到的采样点。如果采样得到的 $t$ 值超过了小立方体的边界，那么我们将光线原点移动到这个边界处，然后按照下一个小立方体的 $\sigma_{maj}$ 重新作指数分布采样。直到采样出来的 $t$ 值在当前的小立方体内，或者越过了整个 participating media，进入新的 participating media，继续上面的整个循环，或者打中物体表面，物体表面的交点作为最终的采样点。其实这个想法的本质上就是将 $\sigma_{maj}$ 不同的小立方体视为不同的 participating media。[equation 14.8](https://pbr-book.org/4ed/Light_Transport_II_Volume_Rendering/The_Equation_of_Transfer#eq:tmaj-over-segments) 其实就是对这一想法的数学化描述
+
 
 这里 MIS 有两处，一个是面向光源采样，一个是根据不同的波长采样，这两处结合起来的方程形式需要考虑一下，另外，allowIncompeletePDF 在这里的使用
 解释 SampleT_maj
