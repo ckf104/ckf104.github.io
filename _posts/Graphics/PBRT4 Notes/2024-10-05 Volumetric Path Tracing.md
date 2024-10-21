@@ -9,7 +9,7 @@
 * 计算一次黎曼和（这个对应 $L_e$，也就是自发光项的贡献）
 * 在当前位置采样一个 in scattering 方向，如果这个方向能击中光源，沿着这个采样的方向又做 ray marching（求黎曼和），然后计算这条 in scattering 光路对结果的贡献（这里要求能击中光源也是出于只有一次 scattering 的简化，如果考虑各个方向反射过来的环境光的话，追踪一条光线就分裂出了追踪多条光线，path tracing 就没法做了）
 直到前进 dt 长度光线离开了这个 participating media，那就正常往前继续做路径追踪即可（细想一下这里我觉得稍微有些别扭，如果使用路径追踪的话，这里光源 in-scattering 的贡献属于什么路径呢？）
-## Ratio Tracking and Null Scattering
+## Ratio Tracking, Null Scattering, and Delta Tracking
 
 TODO：解释公式 (11.13) 的推导
 ## General Solution of Rendering Equation with Participating Media
@@ -61,8 +61,10 @@ $$
 
 
 这里 MIS 有两处，一个是面向光源采样，一个是根据不同的波长采样，这两处结合起来的方程形式需要考虑一下，另外，allowIncompeletePDF 在这里的使用
-
-
+解释 SampleT_maj
+解释 specularBounce，解释 r_l rescaling
+在每个位置采样 $L_e$
+这个方法可以拓展到 non-specular microfacet
 
 TODO：
 * 这个采样的路径长度是否要考虑 null scattering，我感觉面向光源采样的时候得到的路径上可能有多个 null scatter，路径长度不太对？

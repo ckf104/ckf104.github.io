@@ -91,6 +91,8 @@ Path Tracer 额外增加了以下的特性
 在讨论 Path Regularization 之前，我们先讨论它提出的背景。因为根据 BSDF 采样生成路径的概率不一定与间接光照的强度相匹配，有时候会导致大的方差，在屏幕上产生亮点。设想一个场景，光源是一个小圆盘，然后设想一条路径，它首先经过一个 lambertian material，因此在该处会在球面上按余弦值大小作为采样权重选取一个新方向。然后这个新方向撞上一个镜面反射材质，因此在这里没办法面向光源采样，然后镜面反射的方向恰好撞上这个小光源。由于此前的镜面反射，因此 MIS 的权重为 1，加上之前 lambertian material 近似均匀的采样，得到概率密度值很小，这导致我们最终估计出一个较大的 L，在屏幕上产生亮点
 
 本质来讲，上面现象产生的原因还是根据 BSDF 采样时可能与间接光强度不匹配，lambertian material 材质是一种极端情况，它没有提供任何间接光强度的信息。我认为要从根本上解决问题需要 Path Guiding 之类的技术。相对来讲 Path Regularization 是一种简单的解决方案，它的观察在于，这个亮点产生的原因，还在于说路径中存在镜面反射，它导致了没有办法通过面向光源采样和 MIS 来降低 BSDF 上 radiance 的估计。因此 Path Regularization 就是在采样前将路径上的 BSDF 变得更粗糙一些
+
+最后还有一件事。如果场景中有多个 infinite lights，代码中在面向光源采样时每次至多采样一个 infinite light，而根据 bsdf 采样时（即光线没有命中物体表面）会同时采样所有的 infinite lights，这样的不一致性是否会造成什么问题。我们可以等效地将场景中的 infinite lights 都合并为单个 infinite light，因此 bsdf 同时采样所有的 infinite lights 就等效为采样这合并后的 infinite light。而面向光源采样时采样单个 infinite light 就相当于对这若干个 infinite lights 求和的离散蒙特卡洛估计（见 [12.2 式](https://www.pbr-book.org/4ed/Light_Sources/Light_Sampling#eq:mc-sampled-sum)）。这也可以说是一个潜在的优化点，在初始化场景时，应该就把所有的 infinite light 合并，面向光源采样时也直接采样这个合并的 infinite light，这样方差会小一些
 #### 无偏性分析
 
 从前面的分析我们可以看到，如果 Simple Path Tracer 能够不限制路径的最大深度，无限求和直到收敛时，它是一个 radiance 的无偏估计。我们现在考虑 Path Tracer 中使用的 δ 光源对应的 δ 概率函数（虽然 Simple Path Tracer 也有 δ 概率函数，但它没有结合 MIS 使用），Incomplete PDF，镜面反射，Russian Roulette 这些技巧对无偏性是否会产生影响
