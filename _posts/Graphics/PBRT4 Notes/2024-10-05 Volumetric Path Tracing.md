@@ -136,8 +136,17 @@ $$一种方法是，我们使用 sampler 拿到一个二维的采样结果 $(u,v
 
 TODO：理解这一问题
 TODO：理解处理 bssrdf 采样的代码
+## Layered Bxdf
+
+TODO：解释为什么采样 `exitInterface` 的 wi 方向过来的入射光线的折射方向时 `TransportMode` 要取反
+TODO：解释 two sided 参数，什么是双面材质？
+TODO：解释 14.31 公式，现在 beta 项会有个额外的 $1/cos\theta$
+TODO：我感觉这个方法可以进一步用来刻画 bssrdf
+TODO：为什么 sample_f 函数最后返回的 f 值没有乘以 $cos\theta$，可能需要看下 [Position-Free Monte Carlo Simulation for Arbitrary Layered BSDFs](https://shuangz.com/projects/layered-sa18/) 论文的推导才行
+TODO：解释公式 14.36，为什么会单独使用 brdf 和 btdf 呢，概率我觉得还是应该用 bsdf 才对呀
 
 参考资料
 * [Production Volume Rendering](https://graphics.pixar.com/library/ProductionVolumeRendering/paper.pdf)
 * [Monte Carlo methods for physically based volume rendering](https://cs.dartmouth.edu/~wjarosz/publications/novak18monte-sig.html) 这个 18 年的 siggraph course 据说讲得很好，还罗列了最近的一些与这个话题有关的论文
 * 据 [hw2: Volumetric Path Tracing](https://cseweb.ucsd.edu/~tzli/cse272/wi2024/homework2.pdf) 中说 [Integral formulations of volumetric transmittance](https://dl.acm.org/doi/pdf/10.1145/3355089.3356559) 讨论了为什么解一个常微分方程来得到 volumetric rendering equation，而不是直接两边同时积分（虽然正常感觉，对两边同时积分得到的形式进行采样的话方差会很大吧）
+* [Position-Free Monte Carlo Simulation for Arbitrary Layered BSDFs](https://shuangz.com/projects/layered-sa18/)：讨论 layered material 的论文
