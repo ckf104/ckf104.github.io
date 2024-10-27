@@ -47,7 +47,72 @@ $$$(-1,1,1)$ 也就是原向量 $(1,1,1)$ 用 $h1,h2,h3$ 表示下的坐标（�
 但现在给定一个可逆方阵 $A_{ij}$，我们也可以认为它的两组基相同，都为 $e_i$，那么 $A_{ij}$ 不改变坐标的基，但是把一个坐标映射到另一个坐标上了。现在我们回头看 9.3 节的问题，给出一个在一个坐标系 $e_i$ 下的变换 $T$，问它在另一个坐标系 $h_i$ 描述下的相同变换。我们假设矩阵 $M$ 将以 $e_i$ 描述的坐标变换到以 $h_i$ 描述的坐标。而 $T$ 可以看作是 $e_i$ 到 $e_i$ 的变换，根据上面的讨论，我们容易知道在 $h_i$ 描述下的这个旋转矩阵应该是 $MTM^{-1}$。这也说明了相似矩阵的几何意义，即描述不同基下的相同变换
 
 TODO：解释四元数的插值
+## SceneComponent and Its Movement
 
+`TTransform<T>` 包含 Scale -> Rotate -> Translate（变换顺序）的完整的变换，`TTransform` 重载了乘法操作，乘法是对 `TTransform` 的复合（A 乘 B 的结果是先应用 A 变换，再应用 B）。但正如实现中注释解释的那样，它这里假定了 scale 是一个标量（即不会进行不等比的缩放）
+```c++
+	//	When Q = quaternion, S = single scalar scale, and T = translation
+	//	QST(A) = Q(A), S(A), T(A), and QST(B) = Q(B), S(B), T(B)
+
+	//	QST (AxB) 
+
+	// QST(A) = Q(A)*S(A)*P*-Q(A) + T(A)
+	// QST(AxB) = Q(B)*S(B)*QST(A)*-Q(B) + T(B)
+	// QST(AxB) = Q(B)*S(B)*[Q(A)*S(A)*P*-Q(A) + T(A)]*-Q(B) + T(B)
+	// QST(AxB) = Q(B)*S(B)*Q(A)*S(A)*P*-Q(A)*-Q(B) + Q(B)*S(B)*T(A)*-Q(B) + T(B)
+	// QST(AxB) = [Q(B)*Q(A)]*[S(B)*S(A)]*P*-[Q(B)*Q(A)] + Q(B)*S(B)*T(A)*-Q(B) + T(B)
+```
+但单论结果的表达式是很合理的，即复合后的 `TTransform` 的 缩放，旋转矩阵分别是原本两个缩放，旋转矩阵的叠加。而平移矩阵是第一个平移矩阵在经历第二个 `TTransform` 的缩放旋转后再叠加第二个平移矩阵
+
+类似地，还有 `TTransform<T>::GetRelativeTransform(const TTransform<T>& Other)`,它返回的是 `Other` 的逆变换乘以 this
+
+与 scene component 最直接相关的字段是
+```c++
+/** Location of the component relative to its parent */
+UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_Transform, Category = Transform, meta=(AllowPrivateAccess="true", LinearDeltaSensitivity = "1", Delta = "1.0"))
+FVector RelativeLocation;
+
+/** Rotation of the component relative to its parent */
+UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_Transform, Category=Transform, meta=(AllowPrivateAccess="true", LinearDeltaSensitivity = "1", Delta = "1.0"))
+FRotator RelativeRotation;
+
+/**
+*	Non-uniform scaling of the component relative to its parent.
+*	Note that scaling is always applied in local space (no shearing etc)
+*/
+UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_Transform, Category=Transform, meta=(AllowPrivateAccess="true", LinearDeltaSensitivity = "1", Delta = "0.0025"))
+FVector RelativeScale3D;
+
+/** Current transform of the component, relative to the world */
+FTransform ComponentToWorld;
+```
+`RelativeLocation`，`RelativeRotation` 以及 `RelativeScale3D` 表示该 scene component 相对于 parent 的变换，即
+```c++
+this->ComponentToWorld = FTransform(RelativeScale3D, RelativeRotation, RelativeLocation) * parent->ComponentToWorld;
+```
+如果 `bAbsoluteLocation`，`bAbsoluteRotation`，`bAbsoluteScale` 中某个为 true 的话，上面相应的 RelativeXXX 变换也变成绝对含义（就直接是世界坐标的变换了），具体此时 `ComponentToWorld` 的计算参考 `CalcNewComponentToWorld_GeneralCase` 函数
+
+在具体讨论 scene component 向上层提供的变换 API 之前，我们先讨论其内部的一些函数。其中两个重要的函数是 `UpdateComponentToWorld` 以及`UpdateComponentToWorldWithParent`，前者只是对后者的一个简单封装，提供了默认的参数
+
+`UpdateComponentToWorldWithParent` 的用处是，在修改了前面的 RelativeXXX 变换后，更新 `ComponentToWorld` 成员变量。这个 component 的变换更新后，不改变它的 parent 的变换，但会改变其子节点的变换。因此该函数内部调用 `PropagateTransformUpdate` 函数，这个函数负责广播 component 的变换更新了，并且调用 `UpdateChildTransforms` 函数，这个函数又进一步调用每个 child 的 `UpdateComponentToWorld`，这样递归地对 child 的 `ComponentToWorld` 进行更新。请注意，父节点的变换改变后，子节点的 RelativeXXX 是不需要改的，不论 `bAbsoluteXXX` 是否为 true（因为 `bAbsoluteXXX` 除了表示相应的变换对应世界坐标外，也表示子节点的这个变换不再跟随着父节点了：在 `bAbsoluteXXX` 为 false 时，父节点的变换改变，子节点的 RelativeXXX 不改变就对应子节点在跟着父节点一起动）
+
+`SetRelativeLocationAndRotation`
+
+
+MoveComponentImpl
+InternalSetWorldLocationAndRotation
+
+```c++
+/** What we are currently attached to. If valid, RelativeLocation etc. are used relative to this object */
+UPROPERTY(ReplicatedUsing = OnRep_AttachParent)
+TObjectPtr<USceneComponent> AttachParent;
+```
+`SceneComponent` 的结构：`SceneComponent` 可以通过父子节点关联，整个 Actor 的 `SceneComponent` 呈现树状结构。每个 `SceneComponent` 的 `RelativeLocation`，`RelativeRotation` 和 `RelativeScale3D` 默认情况下是相对父节点来说的（除非设置 `bAbsoluteLocation` 等为真），而 `ComponentToWorld` 参数则表示相对于世界的变换
+## Rotation
+
+`TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系），**具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先顺时针沿着 -z 轴转（在 +z 轴的位置，看向 -z 轴），再逆时针沿着 -y 轴转，最后逆时针沿着 -x 轴转**
+
+四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置
 ## Transform Matrix
 
 UE 中使用的投影矩阵是 Reversed Z Perspective Matrix，看下面函数的实现就知道了
@@ -61,13 +126,6 @@ FMinimalViewInfo::CalculateProjectionMatrix();
 TODO：ue 的摄像机 lookat 的方向是哪个？+Z 轴，-Z 轴，还是表示 forward 的 X 轴？
 
 ue 使用左手坐标系，X 轴对应 Forward Vector，Y 轴对应 Right Vector，Z 轴对应 Up Vector
-
-## Rotation
-
-`TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系），**具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先顺时针沿着 -z 轴转（在 +z 轴的位置，看向 -z 轴），再逆时针沿着 -y 轴转，最后逆时针沿着 -x 轴转**
-
-四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置
-
 ## Camera and Transformation
 
 * `SceneComponent` 的结构：
@@ -77,10 +135,6 @@ ue 使用左手坐标系，X 轴对应 Forward Vector，Y 轴对应 Right Vector
 * `ViewTarget` 中的 target 和 POV 的关系是什么
 * 对 `SpringArmComponent` 的理解：在 [Player-Controlled Cameras](https://dev.epicgames.com/documentation/en-us/unreal-engine/quick-start-guide-to-player-controlled-cameras-in-unreal-engine-cpp) 教程中，对 SpringArm 调用了 `SetRelativeLocationAndRotation` 方法。这个方法其实来自于 `SceneComponent`，设置 `Component` 和父节点的相对位置。`SpringArmComponent` 则是 `SceneComponent` 的子类。我理解的 `Location` 和 `Rotation` 对于 `SpringArm` 的含义是看的对象的位置，以及看的角度。而配置参数 `socket offset`，`target offset` 则是对其的微调，见 [UE SpringArm TargetOffset 和 SocketOffset 区别](https://www.bilibili.com/read/cv14318016/)
   * 那将一个 `CameraComponent` attach 到 SpringArm 上又如何呢？[UE4 里的 Camera 系统](https://zhuanlan.zhihu.com/p/149176416) 中讨论说，`APlayerCameraManager` 里的 `ViewTarget` 中 Actor 作为观察的对象，`FMinimalViewInfo` 是根据 Actor 计算出的相机数据，其中调用了 Actor 的 `CalcCamera` 方法，在 `CalcCamera` 实现中，会检索 Actor 是否存在 `CameraComponent`，如果存在，那么将使用该 `CameraComponent`，调用它的 `GetCameraView` 方法。该方法将 `CameraComponent` 的位置和朝向作为摄像机的位置和朝向。而 `CameraComponent` 作为 `SceneComponent`，只存储相对的位置和朝向，会调用父节点 `SpringArmComponent` 的 `GetSocketTransform` 方法来计算自己在世界坐标中的位置和朝向。该方法默认情况下直接返回节点的 Transform，但 `SpringArmComponent` 重载了该函数，返回的 Transform 会额外乘 `RelativeSocketRotation` 和 `RelativeSocketLocation` 对应的变换。这俩参数的值是用 `TargetArmLength`，`TargetOffset`，`SocketOffset` 等 SpringArm 的参数进行控制
-## SceneComponent and Its Movement
-`TTransform<T>` 包含 Scale -> Rotate -> Translate（变换顺序）的完整的变换
-`TTransform ComponentToWorld` 记录了
-
 ## ActorComponent
 
 * AActor 中重要的一些字段
