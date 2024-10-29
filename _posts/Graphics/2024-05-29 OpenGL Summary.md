@@ -92,6 +92,7 @@ GLBindBuffer:
 Uniform Buffer Object（UBO）的使用则更加复杂一些，类似于 Texture，OpenGL Context 中存在若干数量的 uniform buffer binding location，我们需要同时在 Program Object 侧和 Buffer 侧将其绑定到同一个 binding location 上：
 
 * 使用 [glGetUniformBlockIndex](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glGetUniformBlockIndex.xhtml) 获取它在 Program Object 中的 block index，然后调用 [glUniformBlockBinding](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glUniformBlockBinding.xhtml) 将 Program 侧的 UBO 绑定到指定的 binding location 上，可以通过 [layout qualifer](https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)) 在 glsl 中显式指定 binding location（可以指定 block index 吗？）
+* 使用 glGenBuffer 创建 GL_UNIFORM_BUFFER
 * 使用 [glBindBufferBase](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferBase.xhtml) 或者 [glBindBufferRange](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferRange.xhtml) 将 Buffer Object 绑定到指定的 binding location 上，需要设置 Target 参数为 GL_UNIFORM_BUFFER（我猜想需要 Target 的参数的原因是不同的 target 有自己的 binding location space？），[glBindBufferRange](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferRange.xhtml) 是绑定 buffer 的一个 subRange 到 binding location 上
 * 通过 [glBufferData](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBufferData.xhtml) 和 [glBufferSubData](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBufferSubData.xhtml) 设置 Buffer Object 的数据
 
@@ -140,9 +141,9 @@ Sample Coverage，Sample Mask，我大概理解它们的意思，但是没咋明
 
 texture 的 mipmap 层级由 GL_TEXTURE_BASE_LEVEL 和 GL_TEXTURE_MAX_LEVEL 这两个 texture parameter 指定，在使用 glTexImage2D 时可以指定要初始化的 mipmap level。除了手动初始化各个 level 外，可以调用 glGenerateMipmap 来让 OpenGL 自动生成 mipmap 纹理
 
-纹理采样时具体选择哪一级的 mipmap 纹理，具体算法在 OpenGL 4.5 spec 的 8.14 Texture Minification 一节（选择 4.5 spec 是因为 4.6 中引入了 Anisotropic filtering，算法讨论更加复杂了），最核心的公式是 $$\rho$$ 值的计算
+纹理采样时具体选择哪一级的 mipmap 纹理，具体算法在 OpenGL 4.5 spec 的 8.14 Texture Minification 一节（选择 4.5 spec 是因为 4.6 中引入了 Anisotropic filtering，算法讨论更加复杂了），最核心的公式是 $\rho$ 值的计算
 $$
-\rho(x,y) = max\left\{\sqrt{(\frac{ \partial u }{ \partial x })^2 + (\frac{ \partial v }{ \partial x })^2 + (\frac{ \partial w }{ \partial x })^2}, \sqrt{(\frac{ \partial u }{ \partial x })^2 + (\frac{ \partial v }{ \partial x })^2 + (\frac{ \partial w }{ \partial x })^2}\right\}
+\rho(x,y) = max\left\{\sqrt{(\frac{ \partial u }{ \partial x })^2 + (\frac{ \partial v }{ \partial x })^2 + (\frac{ \partial w }{ \partial x })^2}, \sqrt{(\frac{ \partial u }{ \partial y })^2 + (\frac{ \partial v }{ \partial y })^2 + (\frac{ \partial w }{ \partial y })^2}\right\}
 $$
 其中 $x,y$ 是屏幕坐标，而 $u,v,w$ 是纹理坐标（如果是二维纹理，$w=0$）。对 $\rho$ 值的直观理解上，在这个三角形内，屏幕坐标移动单位 1，纹理坐标会移动 $\rho$，这意味着屏幕坐标中的一个像素相当于纹理空间的 $\rho^2$ 个纹素，由此可以理解为什么要选取 $log_2\rho$ 层的 mipmap 采样
 
@@ -283,12 +284,12 @@ $$
 但以物体为粒度进行深度排序是不够的，因为物体间可能相互遮挡，A 物体一部分在 B 前面，另一部分在 B 后面这种（**所以一般渲染半透明物体时都会关闭深度测试**）
 
 ## Primitive Type and Geometry Shader
-
-* GL_POINTS
-* GL_LINES，GL_LINE_STRIP，GL_LINE_LOOP
-* GL_LINE_STRIP_ADJACENCY，GL_LINES_ADJACENCY
-* GL_TRIANGLE_STRIP，GL_TRIANGLE_FAN，GL_TRIANGLES
-* GL_TRIANGLE_STRIP_ADJACENCY，GL_TRIANGLES_ADJACENCY
+在 `glDrawArrays` 的 mode 参数中接收的图元以及与之对应的 geometry shader 的 input
+* GL_POINTS --> points
+* GL_LINES，GL_LINE_STRIP，GL_LINE_LOOP  --> lines
+* GL_LINE_STRIP_ADJACENCY，GL_LINES_ADJACENCY  --> lines_adjacency
+* GL_TRIANGLE_STRIP，GL_TRIANGLE_FAN，GL_TRIANGLES  --> triangles
+* GL_TRIANGLE_STRIP_ADJACENCY，GL_TRIANGLES_ADJACENCY--> triangles_adjacency
 * GL_PATCHES
 
 ADJCENCY 后缀的 primitive 是为 geometry shader 提供额外的相邻 primitive 的信息，见 OpenGL Programming Guide 的 Geometry Shader 中对此的讨论

@@ -56,37 +56,31 @@ TODO
 
 * 关于 normal mapping 与 bump mapping 与的 TBN 矩阵
 
-  * 首先解释 u，v 坐标轴的含义。根据重心坐标进行插值的纹理映射是可逆的，通常我们是求出来某点在世界坐标中的重心坐标，然后得到其纹理坐标，我们当然也可以反过来考虑由此
-    $$
+  * 首先解释 u，v 坐标轴的含义。根据重心坐标进行插值的纹理映射是可逆的，通常我们是求出来某点在世界坐标中的重心坐标，然后得到其纹理坐标，我们当然也可以反过来考虑由此 $$
     x = f_x(u,v), \quad y = f_y(u,v), \quad z = f_z(u,v)
     $$
-    可以得到 T，B 轴。N 轴由叉乘得到
-
-  $$
+    可以得到 T，B 轴。N 轴由叉乘得到 $$
   \vec{T} = (\frac{\partial{x}}{\partial{u}},\frac{\partial{y}}{\partial{u}},\frac{\partial{z}}{\partial{u}}) \quad \vec{B} = (\frac{\partial{x}}{\partial{v}},\frac{\partial{y}}{\partial{v}},\frac{\partial{z}}{\partial{v}}) \quad \vec{N} = \vec{T} \times \vec{B}
   $$
-
-  
-
   * 一种直观理解 $\vec{T}$ 和 $\vec{B}$ 的方式是，当世界坐标中的三角形中的某个像素点沿着 $\vec{T}$ 方向移动时，它对应的 $(u,v)$ 坐标中仅有 $u$ 会移动，而 $v$ 保持不变（对于一般的可逆映射来说，只能对无穷小量成立，但这里的映射显然是线性的，因此它总是成立的）。$\vec{B}$ 也是同样的道理。这就是 u, v 轴的来历，即 $\vec{T}$ 和 $\vec{B}$ 代表了纹理坐标的变化方向
 
-  * 那 $\vec{T}$ 和 $\vec{B}$ 是不是应该垂直呢？毕竟 u，v 轴本身是垂直的。是应该这样，只要这个映射没有发生形变。就是说，如果纹理图上的三角形与世界坐标中的三角形是相似的，那么 $\vec{T}$ 和 $\vec{B}$ 是垂直的。为了看出这一点，我们需要将上面的映射写为矩阵形式
-    $$
+  * 那 $\vec{T}$ 和 $\vec{B}$ 是不是应该垂直呢？毕竟 u，v 轴本身是垂直的。是应该这样，只要这个映射没有发生形变。就是说，如果纹理图上的三角形与世界坐标中的三角形是相似的，那么 $\vec{T}$ 和 $\vec{B}$ 是垂直的。为了看出这一点，我们需要将上面的映射写为矩阵形式$$
     \vec{x} = A\vec{u} +\vec{b}
     $$
     这里我们将 $(u,v)$ 拓展为 $(u,v,0)$，因此 $A$ 是一个 3x3 的矩阵。可以知道 $\vec{T}$ 对应矩阵的第一列，而 $\vec{B}$ 对应矩阵的第二列。第三列由于没有实际作用，我们暂时不管。由于对世界坐标中的三角形平移常量不改变偏导数的值，因此我们可以不妨设 $\vec{b}$ 为 0，另外，由于两个三角形相似，我们可以对矩阵 A 乘以常量缩放因子 k，使得两个三角形全等（这并不改变 $\vec{T}$ 和 $\vec{B}$ 的方向），现在可以看出矩阵 $kA$ 实际上是一个保距变换，因此是一个正交矩阵，从而可知 $\vec{T}$ 和 $\vec{B}$ 垂直
 
-  * 接下来我们说明上面的公式和下面实际应用中的公式其实是一致的。这里 $\vec{E_1}$ 和 $\vec{E_2}$ 是世界坐标中三角形的两条边，$\Delta{U_1}$ 和 $\Delta{U_2}$ 是在 这两条边对应到 u, v 坐标系中的边的 u 轴差值。$\Delta{V_1}$ 和 $\Delta{V_2}$ 是类似的，$\vec{N}$ 是顶点法线
-    $$
+  * 接下来我们说明上面的公式和下面实际应用中的公式其实是一致的。这里 $\vec{E_1}$ 和 $\vec{E_2}$ 是世界坐标中三角形的两条边，$\Delta{U_1}$ 和 $\Delta{U_2}$ 是在 这两条边对应到 u, v 坐标系中的边的 u 轴差值。$\Delta{V_1}$ 和 $\Delta{V_2}$ 是类似的，$\vec{N}$ 是顶点法线 $$
+    \displaylines{
     \vec{E_1} = \Delta{U_1}\vec{t}+\Delta{V_1}\vec{b} \\
     \vec{E_2} = \Delta{U_2}\vec{t}+\Delta{V_2}\vec{b} \\
     \vec{T} = normalized(\vec{t} - (\vec{t}\cdot\vec{N})\vec{N}) \\
     \vec{B} = normalized(\vec{b} - (\vec{b}\cdot\vec{N})\vec{N} - (\vec{b}\cdot\vec{T})\vec{T})
+    }
     $$
-    
     因为在实际应用中，通常会告知顶点法线，因此 $\vec{N}$ 是已知的。然后容易看出，这里的 $\vec{t}$ 和 $\vec{b}$ 其实和理论公式中的 $\vec{T}$ 和 $\vec{B}$ 是一致的。如果顶点法线与三角形平面的法线一致，那么自然有 $\vec{t}$ 和 $\vec{N}$ 垂直，因此 $\vec{T} = \vec{t},\vec{B}=\vec{b}$
     
-  * 另外一点，相比于在 fragment shader 中求每个像素点的 TBN 矩阵（亦或者这个 TBN 矩阵在顶点中计算，然后插值得到），更常用的方法是将光源向量和视线向量都转到 TBN 空间中（因为 TBN 矩阵是正交矩阵，因此我们只需要取一个转置即可），这样不用在 fragment shader 中乘 TBN 矩阵转换法线到世界坐标系，会更快一些。当然，fragment shader 中看到的光源向量和视线向量都是 vertex shader 输出的值的插值
+  * 在实际的实现上，我们会在 CPU 代码中计算每个顶点的 $\vec{T},\vec{B}$ 向量，然后作为顶点属性传入，由此可以插值得到每个像素点的 TBN 矩阵。但是  $\vec{T},\vec{B}$ 向量是逐三角形的，我们怎么得到单个顶点的 $\vec{T},\vec{B}$ 向量呢？最直接的做法是说不要使用 `GL_TRIANGLE_STRIP` 之类的模式复用顶点，这样每个顶点的 $\vec{T},\vec{B}$ 向量就是这个顶点对应的三角形的 $\vec{T},\vec{B}$ 向量。如果希望复用顶点，那么可以取顶点所在的所有三角形的 $\vec{T},\vec{B}$ 向量的平均作为自己的 $\vec{T},\vec{B}$ 向量（例如 [tutorial-13-normal-mapping](https://www.opengl-tutorial.org/intermediate-tutorials/tutorial-13-normal-mapping/)），当然这种做法引入了一些误差。也许也可以让建模软件导出模型时带上顶点的 $\vec{T},\vec{B}$ 向量，这样就不需要我们手动算了（顶点的 $\vec{T},\vec{B}$ 向量相关的这些考虑实际上和顶点的法线向量是非常类似的）
+  * 比起插值得到每个像素点的 TBN 矩阵，但更常用的方法是将光源向量和视线向量都转到 TBN 空间中（因为 TBN 矩阵是正交矩阵，因此我们只需要取一个转置即可），这样不用在 fragment shader 中乘 TBN 矩阵转换法线到世界坐标系，会更快一些。当然，fragment shader 中看到的光源向量和视线向量都是 vertex shader 输出的值的插值。例如，在 PBRT4 中计算 radiance 都是在 TBN 空间进行计算的
 
   * bump mapping 中的高度位移是 normal mapping 的更原始形式。即当我希望制造一些凹凸感时，在 3D 软件中创造 bump mapping 更加直观，然后我们用 bump mapping 中的高度偏移，计算出实际法线方向，存储在 normal mapping 中
 
