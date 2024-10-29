@@ -96,6 +96,23 @@ this->ComponentToWorld = FTransform(RelativeScale3D, RelativeRotation, RelativeL
 
 `UpdateComponentToWorldWithParent` 的用处是，在修改了前面的 RelativeXXX 变换后，更新 `ComponentToWorld` 成员变量。这个 component 的变换更新后，不改变它的 parent 的变换，但会改变其子节点的变换。因此该函数内部调用 `PropagateTransformUpdate` 函数，这个函数负责广播 component 的变换更新了，并且调用 `UpdateChildTransforms` 函数，这个函数又进一步调用每个 child 的 `UpdateComponentToWorld`，这样递归地对 child 的 `ComponentToWorld` 进行更新。请注意，父节点的变换改变后，子节点的 RelativeXXX 是不需要改的，不论 `bAbsoluteXXX` 是否为 true（因为 `bAbsoluteXXX` 除了表示相应的变换对应世界坐标外，也表示子节点的这个变换不再跟随着父节点了：在 `bAbsoluteXXX` 为 false 时，父节点的变换改变，子节点的 RelativeXXX 不改变就对应子节点在跟着父节点一起动）
 
+然后我们说 `InternalSetWorldLocationAndRotation` 函数，这个函数会接收一个 world position 和一个 world rotation 参数，这是 component 在 world space 中的新位置。函数内部会根据这两个参数对 `RelativeLocation` 和 `RelativeRotation` 进行更新，然后调用 `UpdateComponentToWorldWithParent` 对它和子节点的 `ComponentToWorld` 进行更新
+
+接下来两个重要的函数是 `MoveComponent` 以及 `MoveComponentImpl`，前者是直接调用后者。`MoveComponentImpl` 是一个虚函数，可以被子类重载，至少有以下三个实现
+* scene component 有一个默认是实现（我猜测这个默认的实现是用来移动摄像机之类的物体的？）
+* primitive component 中重载了该函数，因为它需要处理物理碰撞等额外信息
+* skeletal mesh component 重载了该函数，因为它需要处理骨骼动画等额外信息
+scene component 的 `MoveComponentImpl` 实现很简单，因为它处理的是在 scene 中不可见的 component，因此它的实现基本就是调用 `InternalSetWorldLocationAndRotation` 进行更新就可以了
+
+primitive component 额外考虑了物理碰撞的因素，如果 `bsweep` 为 true，那么它会考虑沿途上所有可能的碰撞，最终的位置是停在第一个发生碰撞的位置处。然后调用 `InternalSetWorldLocationAndRotation` 设置更新 component 的位置和旋转
+
+对比这几个 API 函数，`AddLocalOffset`, `AddRelativeLocation`, `AddWorldOffset`，它们的主要区别在于移动的坐标系参考不同，第一个是相对于物体自身的局部坐标系，第二个是相对于 parent component 的局部坐标系，第三个是相对于 world space 的坐标系。[Coordinate System and Spaces](https://dev.epicgames.com/documentation/en-us/unreal-engine/coordinate-system-and-spaces-in-unreal-engine) 告诉我们，在编辑器界面点击右上角的图标可以切换 local 和 world space 视图。
+
+TODO：在实际测试 primitive component 时观察到的几个现象
+* 如果 `bsweep` 为 false，在碰撞到物体后还发生了转动（这看起来更加真实），但我没理解这个转动是如何发生的，我猜测应该和 overlap 的检测有关，就是 UpdateOverlaps 相关的函数，但不太确定。而 `bsweep` 为 true 时则不会有转动（我猜测是因为它是缓缓扫过去的，因此不会像 `bsweep` 为 false 时穿到内部去然后再根据 overlap 机制弹出来了）
+* 如果 `bsweep` 为 true，且有重力和物理碰撞，cude 移动时会直接与地板碰撞，导致 cude 没法移动，一个相同问题的帖子 # [Moving objects with sweep enabled not working if they are touching the floor and gravity enabled](https://forums.unrealengine.com/t/moving-objects-with-sweep-enabled-not-working-if-they-are-touching-the-floor-and-gravity-enabled/1814530)，但没人回复。但我发现如果移动的方向稍微向上一点（z > 0），就能够动起来了，不知道 UE 里面是咋搞的
+TODO：skeletal mesh component 的 `MoveComponentImpl` 实现
+
 `SetRelativeLocationAndRotation`
 
 
@@ -166,10 +183,3 @@ ue 使用左手坐标系，X 轴对应 Forward Vector，Y 轴对应 Right Vector
 ```
 
 * `Pawn` 相比于 `Actor`，增加了处理输入的能力，例如 `SetupPlayerInputComponent` 虚函数，使得能够使用
-
-
-### Offset
-
-AddLocalOffset
-AddRelativeLocation
-AddActorLocalOffset
