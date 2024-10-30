@@ -64,7 +64,7 @@ TODO：解释四元数的插值
 ```
 但单论结果的表达式是很合理的，即复合后的 `TTransform` 的 缩放，旋转矩阵分别是原本两个缩放，旋转矩阵的叠加。而平移矩阵是第一个平移矩阵在经历第二个 `TTransform` 的缩放旋转后再叠加第二个平移矩阵
 
-类似地，还有 `TTransform<T>::GetRelativeTransform(const TTransform<T>& Other)`,它返回的是 `Other` 的逆变换乘以 this
+类似地，还有 `TTransform<T>::GetRelativeTransform(const TTransform<T>& Other)`,它返回的是 this 乘以 `Other` 的逆变换
 
 与 scene component 最直接相关的字段是
 ```c++
@@ -110,7 +110,7 @@ primitive component 额外考虑了物理碰撞的因素，如果 `bsweep` 为 t
 
 TODO：在实际测试 primitive component 时观察到的几个现象
 * 如果 `bsweep` 为 false，在碰撞到物体后还发生了转动（这看起来更加真实），但我没理解这个转动是如何发生的，我猜测应该和 overlap 的检测有关，就是 UpdateOverlaps 相关的函数，但不太确定。而 `bsweep` 为 true 时则不会有转动（我猜测是因为它是缓缓扫过去的，因此不会像 `bsweep` 为 false 时穿到内部去然后再根据 overlap 机制弹出来了）
-* 如果 `bsweep` 为 true，且有重力和物理碰撞，cude 移动时会直接与地板碰撞，导致 cude 没法移动，一个相同问题的帖子 # [Moving objects with sweep enabled not working if they are touching the floor and gravity enabled](https://forums.unrealengine.com/t/moving-objects-with-sweep-enabled-not-working-if-they-are-touching-the-floor-and-gravity-enabled/1814530)，但没人回复。但我发现如果移动的方向稍微向上一点（z > 0），就能够动起来了，不知道 UE 里面是咋搞的
+* 如果 `bsweep` 为 true，且有重力和物理碰撞，cude 移动时会直接与地板碰撞，导致 cude 没法移动，一个相同问题的帖子 [Moving objects with sweep enabled not working if they are touching the floor and gravity enabled](https://forums.unrealengine.com/t/moving-objects-with-sweep-enabled-not-working-if-they-are-touching-the-floor-and-gravity-enabled/1814530)，但没人回复。但我发现如果移动的方向稍微向上一点（z > 0），就能够动起来了，不知道 UE 里面是咋搞的
 TODO：skeletal mesh component 的 `MoveComponentImpl` 实现
 ```c++
 /** What we are currently attached to. If valid, RelativeLocation etc. are used relative to this object */
@@ -122,11 +122,17 @@ UPROPERTY(ReplicatedUsing = OnRep_AttachChildren, Transient)
 TArray<TObjectPtr<USceneComponent>> AttachChildren;
 ```
 `SceneComponent` 的结构：`SceneComponent` 可以通过父子节点关联，整个 Actor 的 `SceneComponent` 呈现树状结构。每个 `SceneComponent` 的 `RelativeLocation`，`RelativeRotation` 和 `RelativeScale3D` 默认情况下是相对父节点来说的（除非设置 `bAbsoluteLocation` 等为真），而 `ComponentToWorld` 参数则表示相对于世界的变换
+#### GetSocketTransform
+在 `InternalSetWorldLocationAndRotation`，`SetWorldLocation` 等函数中，都需要调用 parent component 的 `GetSocketTransform` 函数来获取 parent 的相对世界坐标的变换，从而将自己相对世界坐标的变换，转化为相对于 parent 的变换，从而设置自己的 `RelativeXXX` 节点。`GetSocketTransform` 是一个虚函数，接收一个 `FName InSocketName` 参数（其实还有一个枚举变量，但通常都使用默认值 `RTS_World`），默认实现就是返回自己的 `ComponentToWorld` 成员
+
+`SceneComponent` 的子类有需求可以重载 `GetSocketTransform` 函数，根据不同的 `InSocketName` 返回不同的 `FTransform`。另外一个可重载的函数 `QuerySupportedSockets` 则返回自己可识别的所有 socket name 
 ## Rotation
 
-`TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系），**具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先顺时针沿着 -z 轴转（在 +z 轴的位置，看向 -z 轴），再逆时针沿着 -y 轴转，最后逆时针沿着 -x 轴转**
+`TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系），**具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先沿着 z 轴按照左手定则规定的正方向旋转，再沿着 y 轴按照右手定则规定的正方向旋转，最后沿着 x 轴按照右手定则规定的正方向旋转**
 
-四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置
+四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置。四元数的旋转总是使用左手定则规定的正方向
+
+`TRotator<T>::Vector` 函数返回一个单位向量，它表示原来指向 x 轴的单位向量在经过这个 rotator 的旋转后的新坐标，如果我们记 yaw 上的旋转角度为 $\theta$，pitch 上的旋转角度为 $\phi$，那么这个结果的向量坐标为 $(cos\phi cos\theta,cos\phi sin\theta,sin\phi)$
 ## Transform Matrix
 
 UE 中使用的投影矩阵是 Reversed Z Perspective Matrix，看下面函数的实现就知道了
