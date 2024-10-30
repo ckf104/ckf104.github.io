@@ -4,6 +4,38 @@
 ### CameraComponent
 TODO：解释它的 `GetCameraView` 函数
 ### CameraActor
+在 PIE 模式下，`UGameInstance::StartPlayInEditorGameInstance` 函数调用 `ULocalPlayer::SpawnPlayActor`，这个函数中调用了 player controller 的 `onPossess` 函数，触发了后面的设置 view target 的逻辑。但是 `UWorld::BeginPlay` 是在 `ULocalPlayer::SpawnPlayActor` 后才调用的，因此设置初始的 view target 时 player controller 调用 `GetAutoActivateCameraForPlayer` 寻找 world 中的 camera actor 时总是找不到的，因为此时 camera actor 的 `BeginPlay` 还没被调用，它还没把自己注册到 world 的 `AutoCameraActorList` 中去。不太确定 game 模式下会不会不太一样
+
+### SpringArmComponent
+spring arm component 的主要作用是作为一个弹簧臂，实现第三人称视角。直观一想可能会觉得没必要，因为直接修改 camera component 相对于 actor 的位置就可以了。但 spring arm component 额外实现了一些功能，一个是相机方位，朝向的渐变（当然是通过插值之类的来实现，但我感觉用处没那么大，因为通常相机的方位改变就是渐变的，只要帧率够高看起来就是连续的了）。另外一个很符合它的名称，就是弹簧臂的伸缩。因为对于第三人称视角，有可能相机和人之间存在障碍物。如果 `bDoCollisionTest` 为真，那么 spring arm 会每个 tick 中检查这一点，如果发现了障碍物，那么就将弹簧臂缩短，保证相机和人之间没有障碍物
+
+它重载了 scene component 的 `QuerySupportedSockets` 和 `GetSocketTransform` 方法。实际上也就一个 socke name
+```c++
+/** The name of the socket at the end of the spring arm (looking back towards the spring arm origin) */
+static ENGINE_API const FName SocketName;
+```
+而它重载的 `GetSocketTransform` 方法返回的不再是自己的 `ComponentToWorld` 成员，而是由 spring arm 的端点的坐标和旋转构成的 `FTransform`，因为通常 spring arm 会挂一个 camera component 作为子节点，而通常 camera component 不会还相对于父节点做旋转变换，而 camera component 的 `GetCameraView` 方法使用 camera component 的位置和旋转设置 `ViewTarget.POV`，这使得最终 spring arm 返回的 `GetSocketTransform` 作为相机的位置和旋转
+
+spring arm 的核心逻辑在 `UpdateDesiredArmLocation` 函数中，这个函数在每个 tick 都会被调用。它负责对相机位置进行更新，其中调用 `GetTargetRotation` 函数获取旋转朝向，当 `bUsePawnControlRotation` 为 true 时，使用 controller 的 control rotation，否则使用 spring arm 自身的旋转朝向（这通常不是第三人称视角所希望的控制，因为 spring arm 通常会 attach 到 pawn 身上，pawn 旋转之后它跟着转，容易把玩家转晕了）。另外 `UpdateDesiredArmLocation` 还会处理障碍物检测以及相机方位，朝向的渐变等逻辑（这里的渐变和 player camera manager 中的渐变有些区别，player camera manager 中的渐变是处理 view target 的切换）
+
+对于第三人称视角，如果使用 spring arm + camera component 的设置，应该将 spring arm 的 `bUsePawnControlRotation` 设置为 true，而 camera component 的 `bUsePawnControlRotation` 值设置为 true/false 都不影响。因为不论 camera component 的此字段是 true 还是 false，只要 spring arm 的此字段为 true，最终相机的旋转方向就会与 controller 的 control rotation 一致。如果把 spring arm 和 camera component 的此字段值都设置为 false，那表现就是上面提到的 camera 跟着 pawn 一块转。但如果是 spring arm 的此字段值设为 false，而 camera component 为 true，最终的表现就会很奇怪。主要的原因在于此时 spring arm 的 rotation 是跟着 pawn 走的，如果移动时改变了朝向，那 spring arm 的朝向也跟着改，使得 camera 的位置发生大幅变化，但 camera 的 rotation 又没变，这操作起来就很奇怪了
+#### Target Offset vs Socket Offset
+从名字上就能看出来，target offset 就是相对于摄像机的对象的偏移，而通常 camera component 会作为 spring arm component 的子节点挂着，因此 socket offset 就是摄像机的位置偏移
+因此这俩 offset 实际上指定了 spring arm 的两个端点的偏移，用代码表示为（具体的逻辑在 `UpdateDesiredArmLocation` 函数中）
+```c++
+FVector Origin = GetComponentLocation() + TargetOffset;
+FVector EndPoint -= DesiredRot.Vector() * TargetArmLength + FRotationMatrix(DesiredRot).TransformVector(SocketOffset);
+```
+其中 `TargetArmLength` 指定 spring arm 的长度，而 `DesiredRot` 是 spring arm 相对于世界坐标的旋转方向。这也可以看到另外一个区别，即 target offset 指定的偏移是世界坐标的偏移，而 socket offset 指定的偏移是局部坐标的偏移
+
+一种直观理解两个 offset 的区别的方法是，设想 spring arm 绕着 z 轴旋转，那么 target offset 实际上偏移了旋转的中心，而 socket offset 不改变旋转中心，只是偏移一下 spring arm 的末端点的值。不过这两个 offset 最终影响的是 camera 的位置，camera 的旋转方向由这里的 `DesiredRot` 决定
+
+### 第三人称模板的实现
+TODO
+
+
+
+
 
 
 `UWorld` 的以下字段记录了游戏中所有的 controller
@@ -26,13 +58,14 @@ UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=PlayerController)
 TSubclassOf<APlayerCameraManager> PlayerCameraManagerClass;
 ```
 ### PlayerCameraManager
+
 `UpdateCamera` 函数的核心任务就是更新 `ViewTarget`，它内部调用 `DoUpdateCamera` 实际地对 `ViewTarget` 进行更新
 ```c++
 /** Current ViewTarget */
 UPROPERTY(transient)
 struct FTViewTarget ViewTarget;
 ```
-`DoUpdateCamera` 首先调用 `FTViewTarget::CheckViewTarget` 更新 `ViewTarget` 的 `Target` 以及 `PlayerState` 字段，然后调用了 `UpdateViewTarget`，首先会根据自己的字段来设置 `ViewTarget.POV` 的默认值，例如 `ViewTargetPOV.AspectRatio` 的值设置为 `PlayerCameraManager.DefaultAspectRatio`。然后根据当前的 `CameraStyle` 的设置进行不同的处理，默认的情况下调用 `UpdateViewTargetInternal` 函数
+`DoUpdateCamera` 首先调用 `FTViewTarget::CheckViewTarget` 根据当前的 player controller 以及一些规则，检查 `ViewTarget` 的 `Target` 以及 `PlayerState` 字段的值是否合理或者做一些调整。然后调用了 `UpdateViewTarget`，首先会根据自己的字段来设置 `ViewTarget.POV` 的默认值，例如 `ViewTargetPOV.AspectRatio` 的值设置为 `PlayerCameraManager.DefaultAspectRatio`。然后根据当前的 `CameraStyle` 的设置进行不同的处理，默认的情况下调用 `UpdateViewTargetInternal` 函数
 而在 `UpdateViewTargetInternal` 中首先调用 `BlueprintUpdateCamera` 函数，这是一个由蓝图重载的函数
 ```c++
 /** 
@@ -45,9 +78,24 @@ ENGINE_API bool BlueprintUpdateCamera(AActor* CameraTarget, FVector& NewCameraLo
 ```
 如果蓝图子类重载了该函数，并且返回 true，那么 `ViewTarget.POV` 就会使用它返回的 `NewGetViewRotationCameraLocation` 等参数作为相机的 location, rotation 以及 fov，`ViewTarget.POV` 中其它的字段则使用 Player Camera Manager 中相应的成员字段，例如 `ViewTarget.POV.AspectRatio` 的值设置为 `PlayerCameraManager.DefaultAspectRatio`
 
-否则，调用 `ViewTarget.Target` 的 `CalcCamera` 函数，`Actor::CalcCamera` 是一个虚函数。我们先看看 Actor 中的默认实现。如果 Actor 的 `bFindCameraComponentWhenViewTarget` 字段为 true，那么它会寻找第一个 Actor 中的 Camera Component，然后调用 Camera Component 的 `GetCameraView` 函数来设置 `ViewTarget.POV`。如果没有找到 Camera Component 或者`bFindCameraComponentWhenViewTarget` 为 false，那么就使用 actor 自身的 location 和 rotation 对 `ViewTarget.POV` 进行更新
+否则，调用 `ViewTarget.Target` 的 `CalcCamera` 函数，`Actor::CalcCamera` 是一个虚函数。我们先看看 Actor 中的默认实现。如果 Actor 的 `bFindCameraComponentWhenViewTarget` 字段为 true，那么它会寻找第一个 Actor 中的 Camera Component，然后调用 Camera Component 的 `GetCameraView` 函数来设置 `ViewTarget.POV`。如果没有找到 Camera Component 或者`bFindCameraComponentWhenViewTarget` 为 false，那么调用 `GetActorEyesViewPoint` 这个虚函数来设置 `ViewTarget.POV` 的 location 和 rotation。这个虚函数默认的实现是使用 actor 自身的 location 和 rotation 对 `ViewTarget.POV` 进行更新，pawn 类型对其进行了重载，它设置 location 还额外考虑了 `BaseEyeHeight` 参数，rotation 则使用 controller 的 `ControlRotation` 字段
 
 一个典型的重载是 `APlayerController::CalcCamera`，它调用 `GetFocalLocation` 和 `GetControlRotation` 来设置 `ViewTarget.POV` 的位置和旋转，前者返回的是 player controller 控制的 pawn 的位置，后者返回的是 controller 的 `ControlRotation` 字段
+
+`UpdateViewTarget` 在调用完 `UpdateViewTargetInternal` 函数后，还调用了 `ApplyCameraModifiers` 与 `UpdateCameraLensEffects`，前者是调用 `UCameraModifier` 类的接口对 `ViewTarget.POV` 进行用户自定义的调整。后者与 `ICameraLensEffectInterface` 相关
+
+在游戏开始时，会调用 `APlayerController::OnPossess`，如果 `bAutoManageActiveCameraTarget` 为 true，那么经过一系列的调用堆栈，最终会调用 `APlayerController::AutoManageActiveCameraTarget` 函数，这个函数接受一个 `SuggestedTarget` 参数，通常就是 pawn。该函数选择 view target 的逻辑是：调用 `GetAutoActivateCameraForPlayer` 函数，如果返回的 camera actor 不为空，那么使用这个 camera actor 作为 view target。否则选择 `SuggestedTarget` 作为 view target。`GetAutoActivateCameraForPlayer` 函数的逻辑也很简单，它遍历场景中的 camera actor，如果某个 camera actor 的 `AutoActivateForPlayer` 字段的值为自己的 player controller 编号，那么就返回这个 camera actor，否则返回空
+
+`APlayerController::SetViewTarget` 函数负责设置 view taregt，它只是 `APlayerCameraManager::SetViewTarget` 的 wrapper
+```c++
+/** 
+* Sets a new ViewTarget.
+* @param NewViewTarget - New viewtarget actor.
+* @param TransitionParams - Optional parameters to define the interpolation from the old viewtarget to the new. Transition will be instant by default.
+*/
+ENGINE_API virtual void SetViewTarget(class AActor* NewViewTarget, FViewTargetTransitionParams TransitionParams = FViewTargetTransitionParams());
+```
+`APlayerCameraManager::SetViewTarget` 除了接收 view target 参数外，还接受一个 transition params，指明在切换 view target 时 camera animation 如何做。如果不考虑 camera animation 相关的逻辑，这个函数主要是调用 `AssignViewTarget` 实际地设置 `ViewTarget.Target`，然后调用 `BecomeViewTarget` 等回调，广播函数。然后调用 `CheckViewTarget`，它负责对 `ViewTarget.Target` 的合理性进行检查和设置 `ViewTarget.PlayerState`
 ### FTViewTarget
 
 `FViewTarget` 的组成
@@ -64,8 +112,7 @@ struct FMinimalViewInfo POV;
 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=TViewTarget)
 TObjectPtr<class APlayerState> PlayerState;
 ```
-
-
+TODO：找到 view target 的初始化
 TODO：`UWorld` 的 player controller 从哪来的，我可以继承重载吗
 
 TODO：
@@ -76,6 +123,16 @@ TObjectPtr<UPlayer> Player;
 ```
 `UPlayer` 的作用是啥
 
-TODO：实现多相机切换，以及相机切换时的渐变过渡
+TODO：实现多相机切换，以及相机切换时的渐变过渡。解释 `PendingViewTarget`，解释 `APlayerCameraManager::SetViewTarget`
 
-TODO：看看如何从 `ViewTarget.POV` 得到透视矩阵
+TODO：看看如何从 `ViewTarget.POV` 得到透视矩阵，包括相机后处理等设置是如何传递到 rendering thread 的
+
+TODO：看看 component 的 register 和 activate 函数（我感觉场景中一开始就有的 actor 会自动 register 它所有的 component，但 activate 是这样吗
+
+TODO：试试 player controller 的 `bAutoManageActiveCameraTarget` 为 false 会怎样，与之相关的是 player controller 的 `AutoManageActiveCameraTarget` 函数，它会自动设置 view target
+
+TODO：解释 `ICameraLensEffectInterface`，以及 `UCameraModifier`，UE 中有许多已经实现好的 `UCameraModifier`，例如 `UCameraModifier_CameraShake`
+
+TODO：对这些出现的类的功能定位进行总结：player controller, player camera manager, camera component, view target, camera modifier 等等
+
+[UE4 Camera系统使用与源码分析](https://zhuanlan.zhihu.com/p/564571102) 讲得很好，也有一些这里没记录的东西，例如可以设置 pawn 的 `bUseControllerRotationPitch`，`bUseControllerRotationYaw` 等字段为 true，使得 pawn 的朝向随着 controller 的 control rotation 来动
