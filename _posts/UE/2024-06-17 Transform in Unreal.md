@@ -47,8 +47,8 @@ $$$(-1,1,1)$ 也就是原向量 $(1,1,1)$ 用 $h1,h2,h3$ 表示下的坐标（�
 但现在给定一个可逆方阵 $A_{ij}$，我们也可以认为它的两组基相同，都为 $e_i$，那么 $A_{ij}$ 不改变坐标的基，但是把一个坐标映射到另一个坐标上了。现在我们回头看 9.3 节的问题，给出一个在一个坐标系 $e_i$ 下的变换 $T$，问它在另一个坐标系 $h_i$ 描述下的相同变换。我们假设矩阵 $M$ 将以 $e_i$ 描述的坐标变换到以 $h_i$ 描述的坐标。而 $T$ 可以看作是 $e_i$ 到 $e_i$ 的变换，根据上面的讨论，我们容易知道在 $h_i$ 描述下的这个旋转矩阵应该是 $MTM^{-1}$。这也说明了相似矩阵的几何意义，即描述不同基下的相同变换
 
 TODO：解释四元数的插值
-## SceneComponent and Its Movement
 
+## TTransform
 `TTransform<T>` 包含 Scale -> Rotate -> Translate（变换顺序）的完整的变换，`TTransform` 重载了乘法操作，乘法是对 `TTransform` 的复合（A 乘 B 的结果是先应用 A 变换，再应用 B）。但正如实现中注释解释的那样，它这里假定了 scale 是一个标量（即不会进行不等比的缩放）
 ```c++
 	//	When Q = quaternion, S = single scalar scale, and T = translation
@@ -65,7 +65,7 @@ TODO：解释四元数的插值
 但单论结果的表达式是很合理的，即复合后的 `TTransform` 的 缩放，旋转矩阵分别是原本两个缩放，旋转矩阵的叠加。而平移矩阵是第一个平移矩阵在经历第二个 `TTransform` 的缩放旋转后再叠加第二个平移矩阵
 
 类似地，还有 `TTransform<T>::GetRelativeTransform(const TTransform<T>& Other)`,它返回的是 this 乘以 `Other` 的逆变换
-
+## SceneComponent and Its Movement
 与 scene component 最直接相关的字段是
 ```c++
 /** Location of the component relative to its parent */
@@ -133,6 +133,9 @@ TArray<TObjectPtr<USceneComponent>> AttachChildren;
 四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置。四元数的旋转总是使用左手定则规定的正方向
 
 `TRotator<T>::Vector` 函数返回一个单位向量，它表示原来指向 x 轴的单位向量在经过这个 rotator 的旋转后的新坐标，如果我们记 yaw 上的旋转角度为 $\theta$，pitch 上的旋转角度为 $\phi$，那么这个结果的向量坐标为 $(cos\phi cos\theta,cos\phi sin\theta,sin\phi)$
+
+## TMatrix
+`TMaxtrix<T>` 是行主序的存储方式。构造函数中传入的 `TPlane<T>` 或者 `TVector<T>` 会初始化 `TMaxtrix<T>` 的一行。但实际上我们传入矩阵数据时，传入的是矩阵数据的转置（例如 PerspectiveMatrix.h 中的矩阵初始化），这样得到的 `TMaxtrix<T>` 也是一个转置。这样做是因为 UE 的矩阵向量乘实现中向量是左乘的（见 `VectorTransformVector` 函数的实现）。这意味着，矩阵 A 乘以矩阵 B，得到的新矩阵对应的变换应该是先应用 A 变换，再应用 B 变换。例如要得到一个变换矩阵，它将 world space 中的点变换到 clip space，那么这个矩阵应该是 view x project（而在向量右乘时应该是 project x view）。这个变换的复合顺序和 `TTransform<T>` 是一致的
 ## Transform Matrix
 
 UE 中使用的投影矩阵是 Reversed Z Perspective Matrix，看下面函数的实现就知道了
@@ -140,9 +143,6 @@ UE 中使用的投影矩阵是 Reversed Z Perspective Matrix，看下面函数�
 ```c++
 FMinimalViewInfo::CalculateProjectionMatrix();
 ```
-
-另外，虽然 TMatrix 是声称行主序，但实际上变换矩阵初始化时总是把列放在行的位置（见 PerspectiveMatrix.h 中的矩阵初始化），因此实际上 TMatrix 是列主序的（这也解释了为什么 FViewMatrices::Init 函数中变换矩阵是右乘的，例如要得到 view_project 的综合变换矩阵，UE  中是 view x project 而不是通常的 project x view）
-
 TODO：ue 的摄像机 lookat 的方向是哪个？+Z 轴，-Z 轴，还是表示 forward 的 X 轴？
 
 ue 使用左手坐标系，X 轴对应 Forward Vector，Y 轴对应 Right Vector，Z 轴对应 Up Vector
