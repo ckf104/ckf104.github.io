@@ -126,16 +126,17 @@ TArray<TObjectPtr<USceneComponent>> AttachChildren;
 在 `InternalSetWorldLocationAndRotation`，`SetWorldLocation` 等函数中，都需要调用 parent component 的 `GetSocketTransform` 函数来获取 parent 的相对世界坐标的变换，从而将自己相对世界坐标的变换，转化为相对于 parent 的变换，从而设置自己的 `RelativeXXX` 节点。`GetSocketTransform` 是一个虚函数，接收一个 `FName InSocketName` 参数（其实还有一个枚举变量，但通常都使用默认值 `RTS_World`），默认实现就是返回自己的 `ComponentToWorld` 成员
 
 `SceneComponent` 的子类有需求可以重载 `GetSocketTransform` 函数，根据不同的 `InSocketName` 返回不同的 `FTransform`。另外一个可重载的函数 `QuerySupportedSockets` 则返回自己可识别的所有 socket name 
+## TMatrix
+`TMaxtrix<T>` 是行主序的存储方式。构造函数中传入的 `TPlane<T>` 或者 `TVector<T>` 会初始化 `TMaxtrix<T>` 的一行。但实际上我们传入矩阵数据时，传入的是矩阵数据的转置（例如 PerspectiveMatrix.h 中的矩阵初始化），这样得到的 `TMaxtrix<T>` 也是一个转置。这样做是因为 UE 的矩阵向量乘实现中向量是左乘的（见 `VectorTransformVector` 函数的实现）。这意味着，矩阵 A 乘以矩阵 B，得到的新矩阵对应的变换应该是先应用 A 变换，再应用 B 变换。例如要得到一个变换矩阵，它将 world space 中的点变换到 clip space，那么这个矩阵应该是 view x project（而在向量右乘时应该是 project x view）。这个变换的复合顺序和 `TTransform<T>` 是一致的
 ## Rotation
 
-`TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系），**具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先沿着 z 轴按照左手定则规定的正方向旋转，再沿着 y 轴按照右手定则规定的正方向旋转，最后沿着 x 轴按照右手定则规定的正方向旋转**
+`TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系）。因为 **具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先沿着 z 轴按照左手定则规定的正方向旋转，再沿着 y 轴按照右手定则规定的正方向旋转，最后沿着 x 轴按照右手定则规定的正方向旋转**
 
 四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置。四元数的旋转总是使用左手定则规定的正方向
 
 `TRotator<T>::Vector` 函数返回一个单位向量，它表示原来指向 x 轴的单位向量在经过这个 rotator 的旋转后的新坐标，如果我们记 yaw 上的旋转角度为 $\theta$，pitch 上的旋转角度为 $\phi$，那么这个结果的向量坐标为 $(cos\phi cos\theta,cos\phi sin\theta,sin\phi)$
 
-## TMatrix
-`TMaxtrix<T>` 是行主序的存储方式。构造函数中传入的 `TPlane<T>` 或者 `TVector<T>` 会初始化 `TMaxtrix<T>` 的一行。但实际上我们传入矩阵数据时，传入的是矩阵数据的转置（例如 PerspectiveMatrix.h 中的矩阵初始化），这样得到的 `TMaxtrix<T>` 也是一个转置。这样做是因为 UE 的矩阵向量乘实现中向量是左乘的（见 `VectorTransformVector` 函数的实现）。这意味着，矩阵 A 乘以矩阵 B，得到的新矩阵对应的变换应该是先应用 A 变换，再应用 B 变换。例如要得到一个变换矩阵，它将 world space 中的点变换到 clip space，那么这个矩阵应该是 view x project（而在向量右乘时应该是 project x view）。这个变换的复合顺序和 `TTransform<T>` 是一致的
+但 extrinsic rotation 和 intrinsic rotation 也差不了太多。`TRotationMatrix<T>` 将欧拉角的旋转表达为一个矩阵的形式（当然存储的结果是转置后的），因为 intrinsic rotation 的旋转等价于 extrinsic rotation 的反向。即每个轴的旋转角不变，但是绕轴旋转的顺序反过来，原来 intrinsic 是 z，y，x 的顺序旋转，那么 extrinsic rotation 就是 x，y，z 的顺序了。理解这个事情的关键在于以两种方式去看待矩阵（轴不变，旋转点。或者是点不变，旋转轴）
 ## Transform Matrix
 
 UE 中使用的投影矩阵是 Reversed Z Perspective Matrix，看下面函数的实现就知道了
