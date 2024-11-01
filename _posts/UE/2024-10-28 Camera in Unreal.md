@@ -112,7 +112,6 @@ struct FMinimalViewInfo POV;
 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=TViewTarget)
 TObjectPtr<class APlayerState> PlayerState;
 ```
-TODO：找到 view target 的初始化
 TODO：`UWorld` 的 player controller 从哪来的，我可以继承重载吗
 
 TODO：
@@ -129,10 +128,19 @@ TODO：看看如何从 `ViewTarget.POV` 得到透视矩阵，包括相机后处�
 
 TODO：看看 component 的 register 和 activate 函数（我感觉场景中一开始就有的 actor 会自动 register 它所有的 component，但 activate 是这样吗
 
-TODO：试试 player controller 的 `bAutoManageActiveCameraTarget` 为 false 会怎样，与之相关的是 player controller 的 `AutoManageActiveCameraTarget` 函数，它会自动设置 view target
-
 TODO：解释 `ICameraLensEffectInterface`，以及 `UCameraModifier`，UE 中有许多已经实现好的 `UCameraModifier`，例如 `UCameraModifier_CameraShake`
 
 TODO：对这些出现的类的功能定位进行总结：player controller, player camera manager, camera component, view target, camera modifier 等等
 
 [UE4 Camera系统使用与源码分析](https://zhuanlan.zhihu.com/p/564571102) 讲得很好，也有一些这里没记录的东西，例如可以设置 pawn 的 `bUseControllerRotationPitch`，`bUseControllerRotationYaw` 等字段为 true，使得 pawn 的朝向随着 controller 的 control rotation 来动
+
+TODO：解释 player camera manager 的 camera cahe
+```c++
+	/** Cached camera properties. */
+	UPROPERTY(transient)
+	struct FCameraCacheEntry CameraCachePrivate;
+
+	/** Cached camera properties, one frame old. */
+	UPROPERTY(transient)
+	struct FCameraCacheEntry LastFrameCameraCachePrivate;
+```
