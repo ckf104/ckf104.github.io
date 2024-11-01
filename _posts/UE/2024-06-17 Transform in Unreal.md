@@ -129,24 +129,28 @@ TArray<TObjectPtr<USceneComponent>> AttachChildren;
 ## TMatrix
 `TMaxtrix<T>` 是行主序的存储方式。构造函数中传入的 `TPlane<T>` 或者 `TVector<T>` 会初始化 `TMaxtrix<T>` 的一行。但实际上我们传入矩阵数据时，传入的是矩阵数据的转置（例如 PerspectiveMatrix.h 中的矩阵初始化），这样得到的 `TMaxtrix<T>` 也是一个转置。这样做是因为 UE 的矩阵向量乘实现中向量是左乘的（见 `VectorTransformVector` 函数的实现）。这意味着，矩阵 A 乘以矩阵 B，得到的新矩阵对应的变换应该是先应用 A 变换，再应用 B 变换。例如要得到一个变换矩阵，它将 world space 中的点变换到 clip space，那么这个矩阵应该是 view x project（而在向量右乘时应该是 project x view）。这个变换的复合顺序和 `TTransform<T>` 是一致的
 ## Rotation
-
 `TRotator<T>` 中存储的是基本的欧拉角 Yaw，Pitch，Roll，并且是 intrinsic rotation（即旋转是相对物体自身的坐标系）。因为 **具体的角度正方向规定在 `Rotator.h` 中解释得很清楚：按照 Yaw，Pitch，Roll 的顺序，先沿着 z 轴按照左手定则规定的正方向旋转，再沿着 y 轴按照右手定则规定的正方向旋转，最后沿着 x 轴按照右手定则规定的正方向旋转**
 
 四元数在 ue 中对应 `TQuat` 结构，注意 W 对应的是实数分量，而 X，Y，Z 分别对应 i，j，k 分量。由于 ue 使用的左手坐标系，因此一些公式会和网上看到的有些不太一样，例如四元数转旋转矩阵的函数 `TQuat<T>::ToMatrix`，左手坐标系得到的旋转矩阵是右手坐标系的旋转矩阵的转置。四元数的旋转总是使用左手定则规定的正方向
 
-`TRotator<T>::Vector` 函数返回一个单位向量，它表示原来指向 x 轴的单位向量在经过这个 rotator 的旋转后的新坐标，如果我们记 yaw 上的旋转角度为 $\theta$，pitch 上的旋转角度为 $\phi$，那么这个结果的向量坐标为 $(cos\phi cos\theta,cos\phi sin\theta,sin\phi)$
+`TRotator<T>::Vector` 函数返回一个单位向量，它表示原来指向 x 轴的单位向量在经过这个 rotator 的旋转后的新坐标，如果我们记 yaw 上的旋转角度为 $\theta$，pitch 上的旋转角度为 $\phi$，那么这个结果的向量坐标为 $(cos\phi cos\theta,cos\phi sin\theta,sin\phi)$。`TRotationMatrix<T>` 则把欧拉角的旋转表达为一个矩阵的形式（当然存储的结果是转置后的）
 
-但 extrinsic rotation 和 intrinsic rotation 也差不了太多。`TRotationMatrix<T>` 将欧拉角的旋转表达为一个矩阵的形式（当然存储的结果是转置后的），因为 intrinsic rotation 的旋转等价于 extrinsic rotation 的反向。即每个轴的旋转角不变，但是绕轴旋转的顺序反过来，原来 intrinsic 是 z，y，x 的顺序旋转，那么 extrinsic rotation 就是 x，y，z 的顺序了。理解这个事情的关键在于以两种方式去看待矩阵（轴不变，旋转点。或者是点不变，旋转轴）
-## Transform Matrix
+extrinsic rotation 和 intrinsic rotation 也差不了太多。因为 intrinsic rotation 的旋转等价于 extrinsic rotation 的反向。即每个轴的旋转角不变，但是绕轴旋转的顺序反过来，原来 intrinsic 是 z，y，x 的顺序旋转，那么 extrinsic rotation 就是 x，y，z 的顺序了。理解这个事情的关键在于以两种方式去看待矩阵（轴不变，旋转点。或者是点不变，旋转轴）
 
+在 UE 的坐标系的约定中，视线前方是 forward 方向，也即 +X 轴的方向，但对于左手坐标系，通常的约定是 view space 中相机看向的是 +Z 轴的方向。因此我们如果直接使用相机的 rotator 的逆矩阵作为 view 矩阵的话（rotator 对应的矩阵是把点从 view space 转到 world space），渲染出来的结果是相机的 up 方向看到的画面。因此 UE 实际上的 view 矩阵是 rotator 的逆矩阵再乘以一个旋转矩阵，这个旋转矩阵轮换了一下坐标轴的方向，使得新的坐标轴的 Z 轴就是相机局部坐标系中的 X 轴。下面的代码出自 `ULocalPlayer::GetProjectionData`
+```c++
+ProjectionData.ViewRotationMatrix = FInverseRotationMatrix(ViewInfo.Rotation) * FMatrix(
+	FPlane(0,	0,	1,	0),
+	FPlane(1,	0,	0,	0),
+	FPlane(0,	1,	0,	0),
+	FPlane(0,	0,	0,	1));
+```
+## Perspective Matrix
 UE 中使用的投影矩阵是 Reversed Z Perspective Matrix，看下面函数的实现就知道了
-
 ```c++
 FMinimalViewInfo::CalculateProjectionMatrix();
 ```
-TODO：ue 的摄像机 lookat 的方向是哪个？+Z 轴，-Z 轴，还是表示 forward 的 X 轴？
-
-ue 使用左手坐标系，X 轴对应 Forward Vector，Y 轴对应 Right Vector，Z 轴对应 Up Vector
+TODO：解释 off-screen projection matrix，以及相应的双目渲染
 ## Camera and Transformation
 
 * `SceneComponent` 的结构：
