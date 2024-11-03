@@ -191,3 +191,5 @@ TODO：解释 off-screen projection matrix，以及相应的双目渲染
 ```
 
 * `Pawn` 相比于 `Actor`，增加了处理输入的能力，例如 `SetupPlayerInputComponent` 虚函数，使得能够使用
+
+TODO：解释第三人称模板中的移动逻辑 `AddMovementInput` 等函数

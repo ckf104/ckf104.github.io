@@ -58,7 +58,6 @@ UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=PlayerController)
 TSubclassOf<APlayerCameraManager> PlayerCameraManagerClass;
 ```
 ### PlayerCameraManager
-
 `UpdateCamera` 函数的核心任务就是更新 `ViewTarget`，它内部调用 `DoUpdateCamera` 实际地对 `ViewTarget` 进行更新
 ```c++
 /** Current ViewTarget */
@@ -96,6 +95,20 @@ ENGINE_API bool BlueprintUpdateCamera(AActor* CameraTarget, FVector& NewCameraLo
 ENGINE_API virtual void SetViewTarget(class AActor* NewViewTarget, FViewTargetTransitionParams TransitionParams = FViewTargetTransitionParams());
 ```
 `APlayerCameraManager::SetViewTarget` 除了接收 view target 参数外，还接受一个 transition params，指明在切换 view target 时 camera animation 如何做。如果不考虑 camera animation 相关的逻辑，这个函数主要是调用 `AssignViewTarget` 实际地设置 `ViewTarget.Target`，然后调用 `BecomeViewTarget` 等回调，广播函数。然后调用 `CheckViewTarget`，它负责对 `ViewTarget.Target` 的合理性进行检查和设置 `ViewTarget.PlayerState`
+### View Target Blending
+在 `APlayerCameraManager::DoUpdateCamera` 函数的最后，调用了 `APlayerCameraManager::FillCameraCache` 函数来将更新的 view target 的 POV 信息填入 `CameraCachePrivate` 字段中。实际上 player camera manager 会 cache 两帧的 pov 信息
+```c++
+	/** Cached camera properties. */
+	UPROPERTY(transient)
+	struct FCameraCacheEntry CameraCachePrivate;
+
+	/** Cached camera properties, one frame old. */
+	UPROPERTY(transient)
+	struct FCameraCacheEntry LastFrameCameraCachePrivate;
+```
+为什么不直接使用 `ViewTarget.POV` 呢，还要额外引入这个 cache 字段。我认为这和 view target blending 有关。当切换 view target 对象，且启用 blending 时，新的 view target 的信息存在 `PendingViewTarget` 中，在 blending 过程中，每次 `DoUpdateCamera` 会同时更新 `PendingViewTarget` 和 `ViewTarget` 的信息。除非 transition param 中 `bLockOutgoing` 为 true，那么 `ViewTarget` 将不会被更新。直到 blending 结束，`PendingViewTarget` 的信息更新到 `ViewTarget` 中，然后将 `PendingViewTarget` 置空。那么在 blending 过程中，实际的 POV 信息实际上是 `ViewTarget` 和 `PendingViewTarget` 的插值，这个结果我们就保存在 `CameraCachePrivate` 中
+### Interaction with Rendering System
+local player 是与 rendering system 沟通的桥梁，它在 `ULocalPlayer::CalcSceneView` 函数中创建 `FSceneView`，并将 player camera manager 的 `CameraCachePrivate` 的 pov 信息也存入到 `FSceneView` 中
 ### FTViewTarget
 
 `FViewTarget` 的组成
@@ -112,6 +125,8 @@ struct FMinimalViewInfo POV;
 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=TViewTarget)
 TObjectPtr<class APlayerState> PlayerState;
 ```
+TODO：camera animation
+
 TODO：`UWorld` 的 player controller 从哪来的，我可以继承重载吗
 
 TODO：
@@ -122,25 +137,10 @@ TObjectPtr<UPlayer> Player;
 ```
 `UPlayer` 的作用是啥
 
-TODO：实现多相机切换，以及相机切换时的渐变过渡。解释 `PendingViewTarget`，解释 `APlayerCameraManager::SetViewTarget`
-
-TODO：看看如何从 `ViewTarget.POV` 得到透视矩阵，包括相机后处理等设置是如何传递到 rendering thread 的
-
 TODO：看看 component 的 register 和 activate 函数（我感觉场景中一开始就有的 actor 会自动 register 它所有的 component，但 activate 是这样吗
 
 TODO：解释 `ICameraLensEffectInterface`，以及 `UCameraModifier`，UE 中有许多已经实现好的 `UCameraModifier`，例如 `UCameraModifier_CameraShake`
 
 TODO：对这些出现的类的功能定位进行总结：player controller, player camera manager, camera component, view target, camera modifier 等等
 
-[UE4 Camera系统使用与源码分析](https://zhuanlan.zhihu.com/p/564571102) 讲得很好，也有一些这里没记录的东西，例如可以设置 pawn 的 `bUseControllerRotationPitch`，`bUseControllerRotationYaw` 等字段为 true，使得 pawn 的朝向随着 controller 的 control rotation 来动
-
-TODO：解释 player camera manager 的 camera cahe
-```c++
-	/** Cached camera properties. */
-	UPROPERTY(transient)
-	struct FCameraCacheEntry CameraCachePrivate;
-
-	/** Cached camera properties, one frame old. */
-	UPROPERTY(transient)
-	struct FCameraCacheEntry LastFrameCameraCachePrivate;
-```
+TODO：看看 UE 的 stereo rendering 的实现，它需要 camera 等做哪些额外的事情（standford 的课 [ EE267: Virtual Reality](https://stanford.edu/class/ee267/)
