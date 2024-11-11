@@ -1,4 +1,3 @@
-看看 [Enhanced Input](https://dev.epicgames.com/documentation/en-us/unreal-engine/enhanced-input-in-unreal-engine) 的文档，写一下这个怎么用的，讨论第三人称模板中是如何实现的
 ### (Enhanced) input component with actor
 这一节描述 input component 和 actor 之间的交互。每个 actor 都有个 input component，虽然我觉得大部分 actor 都用不上。在有了 enhanced input 后，可以在 project settings 中 input component 的默认类型为 `UInputComponent` 或者 `UEnhancedInputComponent`
 ```c++
@@ -285,56 +284,20 @@ trigger state 和 input action value 分别合并的实现有时候会带来出�
 还有一点，当我们设置 p chorded with ctrl 这种的配置时，我们如果按下 ctrl + p，根据前面提到过的 `InjectChordBlockers` 函数添加的 chord blocker，比 p chorded with ctrl 优先级更低的绑定在 p 键上的 action 都不会触发。但同时通常我们也不希望触发 ctrl 绑定的 action。这就要用到之前填充的 `DependentChordActions` 字段了。它以 array 的形式记录了每对 chorded action 和 chording action。在调用 input action 对应的回调函数前，`EvaluateInputDelegates` 函数会检查这个 action 是否是 chording action，如果是，并且它对应的 chorded action 是 trigger 的，就不会调用这个 chording action 的回调函数
 
 不过这个是以 action 而不是按键为判定单位的。例如我们设置 IA_P 为 p chorded with ctrl，并且 ctrl 绑定的是 IA_CTRL1，然后我们再在同一个 IMC 中单独设置一个 IA_CTRL2 也绑定在 ctrl 按键上，因此它的优先级和 IA_CTRL1 相同，那么按下 ctrl + p 时，IA_P 和 IA_CTRL2 都会触发，而 IA_CTRL1 不会触发
-### 蓝图中的动态绑定
-`UInputDelegateBinding` 以及它的子类实现了在蓝图的 event graph 上写回调函数来进行绑定的方法，但没有细看是怎么实现的
-### Enhanced Player Input
-
-实验1：ctrl + w，chorded action 触发了，因此 chording action 不会触发，而与 chording action 相同触发条件的 action 能够触发
-
-实验2：高优先级设置一个 ctrl + p，低优先级设置一个 p，~~单按一个 p 同时触发了 ctrl + p 和 p，为什么？ ~~，一个 action，同一个 event 只会执行一次！action value 的值为（1，1）的原因在于不论是否 trigger，都会调用 modifier 然后设置值，多个 bind 中只要有一个 trigger 了就算 trigger（合并取最大的），然后应用 action 的 一系列 trigger，与之前的合并取最小的 
-
-实验3：高优先级设置一个 ctrl + p，低优先级设置一个 shift + p，可以单独触发 ctrl + p，也可以单独触发 shift + p，如果同时按下 ctrl + shift + p，那么只会触发 ctrl + p
-
-实验4：设置 shift + ctrl + p 的连击，使用配置 p chorded with ctrl, ctrl chorded with shift。这个配置无法触发，因为排序的代码使得 ctrl 会在 shift 前面执行，正确的配置应该是 p chorded ctrl, p chorded with shift 
-
-
-TODO：总结当有多个玩家时的输入设置关系，我尤其关系 player controller 会有多个吗，
-
-
-
-
-
-TODO：整理下面的一堆东西
 ### Trigger Event
-TODO：解释和实验 trigger event 的状态机转化
-
 TODO：解释 trigger 的触发和 actor / component 的顺序先后问题（world tick 执行顺序是怎样的）
+ [Enhanced Input](https://dev.epicgames.com/documentation/en-us/unreal-engine/enhanced-input-in-unreal-engine) 官方文档中详细记录了 implicit trigger 和 explicit trigger 对最终 trigger state 的影响
+* Implicits == 0, Explicits == 0 - Always fires, unless the value is 0.
+* Implicits == 0, Explicits > 0 - At least one explicit has been fired.
+* Implicits > 0, Explicits == 0 - All implicits have been fired.
+* Implicits > 0, Explicits > 0 - All implicits and at least one explicit have been fired.
+* Blockers - Override all other triggers to force a trigger failure.
+这对应代码中的 `FTriggerStateTracker::EvaluateTriggers` 和 `FTriggerStateTracker::GetState` 函数
+### 蓝图中的动态绑定
+TODO：`UInputDelegateBinding` 以及它的子类实现了在蓝图的 event graph 上写回调函数来进行绑定的方法，但没有细看是怎么实现的
+### Others
+[第39期 | 虎跳龙拿--新一代增强输入框架EnhancedInput](https://www.bilibili.com/video/BV14r4y1r7nz/?spm_id_from=444.41.0.0&vd_source=2f38c661a6672237a3f59835e4bfb1a5) 讲得很好，涉及到许多源码流程的分析，还对比了以前的 axis binding 那一套是怎么工作的。还讨论了 enhanced input 和 GAS 以及 game feature 的联动，虽然这些我还不太懂就是了
+[【UE5：検証】Enhanced Input：Priority や Consume Input](https://ci-en.net/creator/15980/article/771199) 讨论了 input action 中设置 consume input 的作用，以及 IMC 的优先级参数在按键绑定到多个 IMC 时的意义。上面代码的分析可以与出它的实验结果相互印证
 
-player controller 重载的 `TickActor` 函数中
-
-[第39期 | 虎跳龙拿--新一代增强输入框架EnhancedInput](https://www.bilibili.com/video/BV14r4y1r7nz/?spm_id_from=444.41.0.0&vd_source=2f38c661a6672237a3f59835e4bfb1a5) 讲得很好，里面提到了 `InputAction->BindAction` 的调用和 `Subsystem->AddMappingContext` 的顺序没有关系，需要看下源码理解其中的原因
-
-另外视频中一些关键的点
-* 以前的 `PlayerInput` 关联 key 与 ActionName/AxisName，而 `InputComponent` 关联 ActionName/AxisName 与 Delegate
-* 在高优先级的 IMC 中的 key 绑定会覆盖低优先级的 IMC 的 key 绑定
-
-TODO：结合桌面的 stateChange.png 测试各个 trigger event，多个 trigger（例如 hold + release） 时是如何处理的，没有 trigger 又意味着什么, 测试一个 input action 包含在多个 IMC 中会怎样，一个按键映射到多个 input action，多个按键映射到一个 input，chorded action
-Implicits == 0, Explicits == 0 - Always fires, unless the value is 0.
-
-	Implicits == 0, Explicits > 0 - At least one explicit has been fired.
-
-	Implicits > 0, Explicits == 0 - All implicits have been fired.
-
-	Implicits > 0, Explicits > 0 - All implicits and at least one explicit have been fired.
-
-	Blockers - Override all other triggers to force a trigger failure.
-
-视频中有人问 ctrl + A 会不会把绑定到 A 的 input action 也触发了，我感觉使用 chorded action 就会触发呀？而且 chorded action 是怎么保证它依赖的 action已经被执行了呢？
-consume lower priority input settings of inputaction
-
-
-一些有关 input action 的设置：
-* Accumulation Behavior：它默认为 take highest absolute value，例如当多个按键绑定到一个 action 上时，同时按多个按键，最后这个 action 收到的 input value 是这些按键的 input value 中绝对值最大的那个。需要注意的是，在代码中是应用了 modifier 后逐维度取绝对值最大（见 `UEnhancedPlayerInput::ProcessActionMappingEvent` 函数），例如经典的 `IA_Move` action 有一个 swizzle modifier，因此 w 和 d 一起按时，它们对应的 input value 是 (1,0,0) 和 (0,1,0)，逐维度取最大后得到的 input value 是 (1,1,0)。还有一个 Accumulation Behavior 是 cumulative，它就是对 input value 做累加嘛
-* Comsume Input
-[【UE5：検証】Enhanced Input：Priority や Consume Input](https://ci-en.net/creator/15980/article/771199) 讨论了 input action 中设置 consume input 的作用，以及 IMC 的优先级参数在按键绑定到多个 IMC 时的意义。
-TODO：我目前尤其关心的问题在于同一个按键绑定到同一个 IMC 的多个 input action 会发生什么。一个典型的例子是 chorded action 实现组合按键，但是 ctrl + a 会不会触发原来绑定到 a 上的行为呢，我发现是不会触发的，为什么？以及 chorded action 的实现显然是有一个顺序上的问题的，因为按下 a 之后需要评估 ctrl 是否 trigger 了，那代码是如何保证这个顺序的呢，我认为有必要再看看 `UEnhancedPlayerInput::EvaluateInputDelegates` 等函数的代码
+TODO：总结当有多个玩家时的输入设置关系，我尤其关系 player controller 会有多个吗
+TODO：整理这些类的逻辑关系：感觉 local player 包含 player controller，player controller 包含 player input。以及 player controller 中包含 player camera manager
