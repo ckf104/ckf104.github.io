@@ -168,8 +168,30 @@ OK，修改完成
 
 在修改LLVM后端时，在**pattern match**部分做了大幅度的简化。通常还会有根据`SDNode`的`Opcode`进行匹配的**pattern match**。而针对例如`vwaddu`这样的在**IR**中没有办法直接表示的指令，还应该有匹配指令序列`sext, sext, add`这样的**pattern match**，另外，我们也没有修改**clang**，因此只能在`IR Pass`中生成该`Intrinsic`去lower到汇编，而没有直接的**C**级别的 `Intrinsic`支持
 
+## 2024.11.16 Update
+最近又需要在 qemu 上实现一些拓展指令，因此这里额外记录一下新的对 tcg 的理解
+#### misc
+全局变量 `tcg_env` 是唯一的 `TEMP_FIXED` 类型的 `TCGTemp`，存储了指向 cpu 状态 `CPURISCVState` 的地址
+在 `target/riscv/tcg/tcg-cpu.c` 中定义了 riscv 的 `TCGCPUOps`，qemu 会在适当的时机执行这些回调函数，其中 `riscv_translate_init` 初始化了 `cpu_gpr` 等 tcg 全局变量，它们实际上指向的是 cpu 状态 `CPURISCVState` 中相应字段，例如 `cpu_gpr` 是对应 `gpr` 字段
+`TCGTemp*` 和 `TCGv` 的转换，两者只差一个 `tcg_ctx` 指针的地址
 
+`tcg_temp_new_i64` 和 `tcg_temp_free_i64` 会从 TCGContext 中分配和释放 `TCGTemp`
+`tcg_gen_op2`，`tcg_gen_op3`，`tcg_gen_op4` 等函数会分配一个新的 `TCGOp` 结构体，它的 `args` 字段存储了 `TCGTemp` 指针
+#### gen_helper
+`target/riscv/helper.h` 中注册了所有的 helper
+`helper-gen.h` 中为每个 helper 生成了相应的 `gen_helper_xx` 函数，而 `helper-info.c.inc` 中为每个 helper 生成了对应的 `TCGHelperInfo` 结构体
 
+`gen_helper_xx` 函数实际上是一个 wrapper，调用 `tcg_gen_callN` 函数，后者会调用 `tcg_op_alloc` 生成 `INDEX_op_call` 指令，调用 `init_call_layout` 初始化 `TCGHelperInfo` 中其它的未初始化字段。这个生成的 `INDEX_op_call` 指令会回调 `helper_xx` 函数
+
+因此，如果要使用 gen_helper 的方法来翻译指令，首先在 `helper.h` 中注册 helper，再定义 `helper_xx` 函数来实际实现该指令的语义。然后在指令翻译的 `trans_xx` 函数中调用 `gen_helper_xx` 来生成 call 指令，这个 call 指令会回调我们定义的 `helper_xx` 函数。调用 `gen_helper_xx` 时传递的参数在回调时会传给 `helper_xx`
+#### overview
+然后是目前总的对 tcg 的理解。我们称 guest 为 qemu 模拟的处理器架构，taregt 为运行 qemu 的处理器架构。`cpu_exec_loop` 函数负责执行模拟执行 guest 中的指令。它首先根据当前 pc 来查找是否有已经翻译好的 `TranslationBlock`，如果没有，就走 tcg 的翻译流程，具体的翻译方法上面已经讲过了。通过调用这些 `tcg_gen_opx` 完成一堆指令的翻译后，生成了一堆 `TCGOp` 结构体，它们之间的依赖关系通过 `TCGTemp` 指针来决定。而这些 `TCGOp` 和 `TCGTemp` 都存储在全局变量 `__thread TCGContext *tcg_ctx` 中，同时生成一个 `TranslationBlock`
+
+`tcg_gen_code` 函数会负责将翻译好的 tcg immediate instruction 再翻译为 target code。对于不同的 `TCGTemp` 类型，翻译的方式也有些不同。对于 `TEMP_EBB` 和 `TEMP_TB` 倒无所谓，因为它们就是临时变量，就正常像 IR lowering 到汇编那样操作就行了。但是 `TEMP_GLOBAL` 类型实打实地对应 guest 处理器可见状态的，如果 IR 指令是对 `TEMP_GLOBAL` 类型的写，那么翻译时需要翻译为对 `CPURISCVState` 中相应字段的写。那怎么拿到 `CPURISCVState` 的地址呢？这就是 `TEMP_FIXED` 的作用了，在翻译到汇编时，`TEMP_FIXED` 占据一个固定的寄存器。riscv qemu 的实现中，`CPURISCVState` 的地址就是一个 `TEMP_FIXED`，因此在翻译对 `TEMP_GLOBAL` 的读写时，翻译为对 `TEMP_FIXED` 占据的固定寄存器的偏移寻址访问即可。这样将 guest code 翻译为 target code 后，直接执行 target code 就行了。在 qemu 自己的代码和 target code 间切换就像是跑了一个协程的感觉
+
+什么时候完成一个 `TranslationBlock` 的翻译呢？一种情况是翻译的指令到达了指定的最大值，或者是例如 csrrw 函数等会影响处理器核心状态的指令，通常都会设置 `DisasContext` 的 `is_jmp` 字段为 `DISAS_NORETURN`，这样在翻译完这条指令后，就会结束当前的 `TranslationBlock`，然后执行它，更新处理器的状态。这是因为有些指令的翻译是依赖于处理器当前状态的。典型的例如 rvv 指令，它具体翻译为哪条指令依赖于当前的 sew（问题来了，如果 vsetvli 包裹在 if else 中咋办捏）。然后我看 if else 等条件分支指令也会设置 `DISAS_NORETURN`，所以我还是没特别理解到底哪些情况下需要设置 `DISAS_NORETURN`
+
+TODO：[tcg 文档](https://www.qemu.org/docs/master/devel/tcg-ops.html#operations) 中提到的 `qemu_ld_i64`，`qemu_st_i64` 指令是怎么用的，还需要看下。这篇 [A deep dive into QEMU: TCG memory accesses](https://github.com/airbus-seclab/qemu_blog/blob/main/tcg_p3.md) 也谈到了这个
 ## 5. Refs
 
 * [qemu decodetree](https://qemu.readthedocs.io/en/latest/devel/decodetree.html)
