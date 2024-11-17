@@ -21,3 +21,20 @@ supervised learning（据说这俩分类要考）
 当参数的 prior distribution 设置为 laplace distribution 和 gaussian distribution 时，我们得到 [lasso and ridge regression](https://www.cnblogs.com/wuliytTaotao/p/10837533.html)，或者说是 L1, L2 的正则惩罚项。[lasso and ridge regression](https://www.cnblogs.com/wuliytTaotao/p/10837533.html) 中解释了为什么 lasso regression 更容易得到 sparse solution，即需要项为 0
 
 logistic regression 进行分类预测
+### lec7
+object detection 中定义了 intersection over union(iou)，来评价 bounding box 的好坏，然后定义了 precision 和 recall 来评价分类的好坏。为什么会有 precision 和 recall 两个指标呢，在给定一个物体类别 C 时，我们想要区分将类别 C 的物体分类为别的物体，和将别的物体分类为类别 C 这两种错误。precision 对应查准率，表示我认为是类别 C 的物体中有多少确实是类别 C，rcall 是查全率，表示我认为是所有是类别 C 的物体中我识别出来了多少
+
+[Recall, Precision, AP, mAP的计算方法](https://blog.csdn.net/weixin_43646592/article/details/113998328) 对 map 讲得挺好，关键在于每个 bounding box 有个 confidence，先将结果数据按照 confidence 从大到小排序，然后绘制 precision 和 recall 的曲线，然后 [浅析经典目标检测评价指标--mmAP（一）](https://zhuanlan.zhihu.com/p/55575423) 也讲得很好。额外提到了计算 ap 时使用 precision 和 recall 曲线围成的面积需要进行一些调整，然后由于 map 依赖于 iou，因此还有 mmap 等等（对 iou 进行平均）
+
+目前看到的一些：
+* lec7：video reasoning，objection detection
+* lec6：ok-robot(pick-and-drop tasks)，large video language model
+* lec5：learning transferable visual models from natural language supervision(什么玩意)，relation transformer for scene graph generation(什么玩意)
+* lec4：llm related，large language model and vision assistant
+
+
+可以考虑的论文和 project 方向
+* object detection
+* image segmentation
+* depth estimation(depth anything)
+* 3d reconstruction
