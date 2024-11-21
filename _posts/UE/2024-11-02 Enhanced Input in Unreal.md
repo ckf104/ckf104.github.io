@@ -299,5 +299,6 @@ TODO：`UInputDelegateBinding` 以及它的子类实现了在蓝图的 event gra
 [第39期 | 虎跳龙拿--新一代增强输入框架EnhancedInput](https://www.bilibili.com/video/BV14r4y1r7nz/?spm_id_from=444.41.0.0&vd_source=2f38c661a6672237a3f59835e4bfb1a5) 讲得很好，涉及到许多源码流程的分析，还对比了以前的 axis binding 那一套是怎么工作的。还讨论了 enhanced input 和 GAS 以及 game feature 的联动，虽然这些我还不太懂就是了
 [【UE5：検証】Enhanced Input：Priority や Consume Input](https://ci-en.net/creator/15980/article/771199) 讨论了 input action 中设置 consume input 的作用，以及 IMC 的优先级参数在按键绑定到多个 IMC 时的意义。上面代码的分析可以与出它的实验结果相互印证
 
+TODO：UI 的输入响应是在哪一部分进行处理的？
 TODO：总结当有多个玩家时的输入设置关系，我尤其关系 player controller 会有多个吗
 TODO：整理这些类的逻辑关系：感觉 local player 包含 player controller，player controller 包含 player input。以及 player controller 中包含 player camera manager

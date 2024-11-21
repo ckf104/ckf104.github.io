@@ -2,6 +2,8 @@ TODO：反射部分的笔记从 UE Notes 中挪到这里
 
 TODO：理解 FGCObject 的作用
 
+TODO：我感觉 UE 的实现里使用了 UClass 宏的类就一定得是 UObject 的子类。但 UStruct 宏的 struct 只视为一个数据集合（没有 UFunction），就不需要是 UObject 的子类
+
 ## Garbage Collection
 
 > When an `AActor` or `UActorComponent` is destroyed or otherwise removed from play, all references to it that are visible to the reflection system (`UProperty` pointers and pointers stored in Unreal Engine container classes such as `TArray`) are automatically nulled. 
