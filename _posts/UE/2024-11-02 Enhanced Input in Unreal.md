@@ -293,6 +293,11 @@ TODO：解释 trigger 的触发和 actor / component 的顺序先后问题（wor
 * Implicits > 0, Explicits > 0 - All implicits and at least one explicit have been fired.
 * Blockers - Override all other triggers to force a trigger failure.
 这对应代码中的 `FTriggerStateTracker::EvaluateTriggers` 和 `FTriggerStateTracker::GetState` 函数
+Trigger State 与 Trigger Event 之间的转换关系见 `UEnhancedPlayerInput::GetTriggerStateChangeEvent` 函数
+
+如果不设置 trigger，通常是我们希望接收连续的输入，典型的例如移动。那么按一次键盘会 trigger 多次。而如果希望按下后仅收到一次 trigger，那么使用 `UInputTriggerPressed`。如果希望松开按键后收到一次 trigger，那么使用 `UInputTriggerReleased`
+
+在第一人称和第三人称模板中的 jump 操作希望实现的效果是按下按键时调用 `Jump` 函数，松开按键时调用 `StopJump` 函数。它的实现是，同时绑定了 `UInputTriggerPressed` 和 `UInputTriggerReleased`，然后把 `Jump` 函数绑定到 start 这个事件上，而 `StopJump` 绑定到 complete 这个事件上。因为整个按下松开的 trigger state 变化为 None -> Triggered -> Ongoing -> Triggered -> None。正好触发一次 start 和一次 complete。注意第一次 trigger 后的下一个状态是 Ongoing，因为一旦按下后 `UInputTriggerReleased` 就会进入 Ongoing 状态
 ### 蓝图中的动态绑定
 TODO：`UInputDelegateBinding` 以及它的子类实现了在蓝图的 event graph 上写回调函数来进行绑定的方法，但没有细看是怎么实现的
 ### Others
