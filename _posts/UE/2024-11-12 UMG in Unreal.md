@@ -78,6 +78,8 @@ TODO：`AddToViewport` 和 `AddToPlayerScreen` 用于将 user widget 显示在�
 [unreal ben ui](https://benui.ca/unreal/#ui) 中有很多 UI 相关的教程，涵盖了下面 TODO 的许多主题，值得一看。比如 [Introduction to C++ UIs in Unreal](https://benui.ca/unreal/ui-cpp-basics/) 讨论了如何使用 C++ 构建 UI
 TODO：跳过了官方文档中的 [UMG Best Practices](https://dev.epicgames.com/documentation/en-us/unreal-engine/umg-best-practices-in-unreal-engine)
 TODO：官方文档中一些其它的教程 [Tutorials and Examples](https://dev.epicgames.com/documentation/en-us/unreal-engine/tutorials-and-examples-for-user-interfaces-in-unreal-engine)
+TODO：[虚幻5UI系统（UMG）基础（已完结）](https://www.bilibili.com/video/BV1gT41137Vp/)，b 站上的一个 umg 系列教程，主要后面讨论了 UI 动画的东西
+TODO：[UE5 UMG的SDF字体渲染](https://zhuanlan.zhihu.com/p/3295334910)
 ### Widget Component and Interaction
 TODO：了解 widget component 以及 widget interaction component
 ### SWidget
