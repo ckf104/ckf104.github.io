@@ -55,3 +55,5 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 // 在这个函数中压入了 render cmd，这个 cmd 会执行渲染操作
 ```
 
+TODO：解释课程中提到的 Actor 的 Children 和 Owner 字段，他说这表示 actor 间的依附关系，我比较好奇第一人称模板中人和抢是不是这种关系
+
