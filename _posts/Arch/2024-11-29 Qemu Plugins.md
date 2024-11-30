@@ -97,4 +97,9 @@ struct qemu_plugin_insn {
 
 然后我们大概说说这些注入是如何实现的。tcg 将每条 guest 指令翻译到 tcg ir 时会进行打桩，例如生成 `INDEX_op_insn_start`，`INDEX_op_plugin_cb from PLUGIN_GEN_FROM_TB`，`INDEX_op_plugin_cb from PLUGIN_GEN_FROM_INSN` 等伪 tcg ir。然后在 `plugin_gen_inject` 函数中，将 `qemu_plugin_tb` 中注册的所有的需要注入的指令，翻译为对应的 tcg ir，插入到对应的桩的位置，然后将这些桩删除掉
 
-TODO：tcg 中的 basic block 是啥样的，翻译跳转指令时一定会退出 tcg 吗
+TODO：
+* tcg 中的 basic block 是啥样的，翻译跳转指令时一定会退出 tcg 吗
+* 正常退出一个 tcg tb 时 pc 是如何更新的 
+* tcg goto 指令的 index 是啥意思，怎么翻译为 host
+这些问题和 tb chains 相关，[qemu tcg跳转的处理](https://wangzhou.github.io/qemu-tcg%E8%B7%B3%E8%BD%AC%E7%9A%84%E5%A4%84%E7%90%86/) 和 [qemu tcg goto_tb分析](https://wangzhou.github.io/qemu-tcg-goto-tb%E5%88%86%E6%9E%90/) 值得再看看
+文档 [tcg internals](https://www.qemu.org/docs/master/devel/tcg.html) 也讨论 `goto_tb + exit_tb` 是如何实现的。我现在大概的理解就是说，在 tb 中有一个 jump table，这个 table 就两个表项。tcg goto 会翻译为一条 load 和一条 jump 之类的，这个 load 就从 jump table 中读取一个地址，然后 jump 根据这个读取的地址跳转。因此 tcg goto 指令后面的 index 就是用来指示应该 load 哪一个表项的。第一次 jump 会跳转到退出这个 tb 的代码，然后 qemu 这边执行下一个 tb 时会把下一个 tb 的地址填到 jump table 中，这样第二次再执行这个 tb 时就直接跳转到下一个需要执行的 tb 上了
