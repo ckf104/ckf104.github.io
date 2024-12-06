@@ -20,5 +20,7 @@ final_matrix = root_node_matrix * child1_node_matrix * child2_node_matrix * ... 
 final_vertex = final_maxtrix1 * w1 + final_maxtrix2 * w2 + ... + final_maxtrixN * wN
 ```
 我们考虑一个手臂上的三角形，它们都被手臂骨骼和手腕骨骼影响，但各自的权重分配并不相同。请注意，当手臂关节或者手臂关节更上层的关节运动时，这个三角形顶点之间的相对位置不会发生变化，因为手臂关节或者手臂关节更上层的关节运动会对 `final_matrix1` 和 `final_matrix2` 产生同样的影响。但是如果手腕关节运动了，此时 `final_matrix1` 不变，而 `final_matrix2` 变化，由于它们在手腕骨骼上的权重不相同，这个三角形不可避免地会发生形变。但这种形变是可以接受的，因为人和动物在关节运动处的皮肤也会有形变
+
+最后一个事情是动画是如何储存的，和 vertex animation 一样，只需要存储关键帧的信息，只是 skeletal animation 存储的不再是顶点的坐标，而是每个 node 在当前帧的旋转矩阵
 ### Animation Blending
 TODO：当游戏中播放人物移动的动画时，假设此时人物又需要跳起来，如何平稳地从一个动画切换到另一个动画。通常制作的动画会使得开始和结束的位姿相同，这样所有的动画公用一个初始位姿的话，就可以在一个动画播放完成后流畅地切换到另一个动画上去，但如何从一个动画的中间切过去呢？
