@@ -12,7 +12,7 @@ categories: [Graphics]
 * view space：以摄像机为原点的坐标系（这里应当先把摄像机平移到原点，再按照摄像机的朝向旋转）
 * clip space：经过投影变换后，坐标范围缩到 -1, 1 的坐标系
 * model matrix 将物体从 local space 变换到 woxrld space，view matrix 将物体从 world space 变换到 view space，projection matrix 将物体从 view space 变换到 clip space
-* 关于为什么会有 local space，因为在建模的时候，通常是一个物体一个物体建模，因此得到的物体坐标总是以物体为中心的。另外，如果我们希望画大量重复物体，那么只用一组坐标，然后通过变换得到若干相同的物体是更可取的
+* 关于为什么会有 local space，因为在建模的时候，通常是一个物体一个物体建模，因此得到的物体坐标总是以物体为中心的。另外，如果我们希望画大量重复物体，那么只用一组坐标，然后通过变换得到若干相同的物体是更可取的。local space 到 world space 施加变换的顺序通常是 scaling，rotation，translation。在 local space 进行 scaling，使得 scaling 的结果不依赖于 rotation 的选择
 
 注意投影矩阵对 z 值的变换表达式，它是关于 z 的反比例函数，意味着它对近平面的 z 值变化比远平面更加敏感，远平面的物体更容易出现 z fighting 的现象。这也意味着，更多的 z 值会集中远平面，即在 1 附近，而浮点数的表示方法使得 0 附近的表示精度比 1 附近大得多，这就是 [Reverse Z](https://tomhultonharrop.com/mathematics/graphics/2023/08/06/reverse-z.html) 要解决的问题。Reverse Z 的映射是反过来的，将远平面上的数映射到 0 附近，而近平面上的数映射到 1 附近（Z 的取值范围为 0 到 1）。此时应该 Z 值大的通过深度测试（**默认深度测试的比较函数是 GL_LESS，深度值小的才会通过测试**）
 
