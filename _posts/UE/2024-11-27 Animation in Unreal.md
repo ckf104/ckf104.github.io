@@ -1,5 +1,6 @@
 TODO：理解第一人称模板中的 Animation Blueprint
 TODO：理解第三人称模板中的骨骼动画
+## Basics
 ### Vertex Animation Basics
 参考了视频 [VAT 1 | What are Vertex Animation Textures](https://www.youtube.com/watch?v=3ep9mkwiOjU) 和文章 [Texture Animation: Applying Morphing and Vertex Animation Techniques](https://medium.com/tech-at-wildlife-studios/texture-animation-techniques-1daecb316657) 这篇文章中还额外谈到了 animation blending 的问题
 
@@ -35,3 +36,14 @@ TODO：了解蒙皮算法。这种多个骨骼影响，加权平均的方法称�
 ### Animation Blending
 TODO：当游戏中播放人物移动的动画时，假设此时人物又需要跳起来，如何平稳地从一个动画切换到另一个动画。通常制作的动画会使得开始和结束的位姿相同，这样所有的动画公用一个初始位姿的话，就可以在一个动画播放完成后流畅地切换到另一个动画上去，但如何从一个动画的中间切过去呢？
 TODO：看一下 games104 的第 9 节，这节课详细地讨论了这个主题
+## UE
+### UE Animation
+[skeletal mesh editor in unreal engine](https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-editor-in-unreal-engine) 提到的 morph target 是什么?
+
+Skeleton，Skeletal Mesh，Animation Sequence，这三类资产的关系是什么？它们对应三类的 [animation editor](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-editors-in-unreal-engine)
+### Skeleton
+对应 `USkeleton` 类，
+### Skeletal Mesh
+对应 `USkeletalMesh` 类，它包含一个指向 skeleton 的指针，表示这个 mesh 对应的 skeleton
+### Animation Sequence
+对应 `AnimSequence` 类，每个 animation sequence 都有个指向 skeleton 的指针，表示这个 animation 和哪个 skeleton 关联的
