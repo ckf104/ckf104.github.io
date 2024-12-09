@@ -41,9 +41,82 @@ TODO：看一下 games104 的第 9 节，这节课详细地讨论了这个主题
 [skeletal mesh editor in unreal engine](https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-editor-in-unreal-engine) 提到的 morph target 是什么?
 
 Skeleton，Skeletal Mesh，Animation Sequence，这三类资产的关系是什么？它们对应三类的 [animation editor](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-editors-in-unreal-engine)
+
+content example animation basics 中的 root motion 中 skeletal mesh 的 bone 的 root 下面一级的 ik_hand_root bone 和 ik_foot_root bone 是拿来干嘛的
 ### Skeleton
-对应 `USkeleton` 类，
+对应 `USkeleton` 类，它的 `ReferenceSkeleton` 中包含了原始的 joint 层次节点数据
+```c++
+/** Reference Skeleton */
+FReferenceSkeleton ReferenceSkeleton;
+
+struct FReferenceSkeleton
+{
+	//RAW BONES: Bones that exist in the original asset
+	/** Reference bone related info to be serialized **/
+	TArray<FMeshBoneInfo>	RawRefBoneInfo;
+	/** Reference bone transform **/
+	TArray<FTransform>		RawRefBonePose;
+	// 上面这俩存储了原始的 joint 的层级结构，以及它们相对的 transform，下面这俩存储的是加入 virtual bones 后的
+	// 最终结果，如果没有 virtual bones，那与原始的层级结构一致
+
+	//FINAL BONES: Bones for this skeleton including user added virtual bones
+	/** Reference bone related info to be serialized **/
+	TArray<FMeshBoneInfo>	FinalRefBoneInfo;
+	/** Reference bone transform **/
+	TArray<FTransform>		FinalRefBonePose;
+}
+```
+#### Slot Groups
+```c++
+	// serialized slot groups and slot names.
+	UPROPERTY()
+	TArray<FAnimSlotGroup> SlotGroups;
+
+	/** SlotName to GroupName TMap, only at runtime, not serialized. **/
+	TMap<FName, FName> SlotToGroupNameMap;
+```
+感觉是用来对动画做分类的，在第三人称模板中有两个 slot group，default group 和 additive group，然后例如 default group 中又包含 default slot，full body，upper body 等等 slot
+#### Socket
+```c++
+void USkinnedMeshComponent::QuerySupportedSockets(TArray<FComponentSocketDescription>& OutSockets);
+```
+从 `QuerySupportedSockets` 实现中可以看出，skeletal mesh component 的 socket 来源有三处，一处是 skeleton 的 `Sockets` 字段，一处是 skeletal mesh 的 `Sockets` 字段。然后所有的 bone 都可以作为 socket。前两处的 socket type 为 socket，bone 作为 socket 时的 socket type 为 bone
+
+非 bone 的 socket 由 `USkeletalMeshSocket` 结构记录
+```c++
+UPROPERTY(Category="Socket Parameters", VisibleAnywhere, BlueprintReadOnly)
+FName SocketName;
+
+UPROPERTY(Category="Socket Parameters", VisibleAnywhere, BlueprintReadOnly)
+FName BoneName;
+
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Socket Parameters")
+FVector RelativeLocation;
+
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Socket Parameters")
+FRotator RelativeRotation;
+
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Socket Parameters")
+FVector RelativeScale;
+```
+`USkeletalMeshSocket` 中记录了它属于哪个 bone，然后它相对于这个 bone 的变换（这感觉也可以把它理解为一个 bone 了）
+在第三人称模板中，skeleton 有三个 sockets，weapon_r，foot_r，foot_l
+
+`GetSocketTransform` 的实现很自然了，根据传入的名称，返回这个 socket / bone 相对于世界坐标的变换
+```c++
+FTransform USkinnedMeshComponent::GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace);
+```
+TODO：virtual bone？
 ### Skeletal Mesh
 对应 `USkeletalMesh` 类，它包含一个指向 skeleton 的指针，表示这个 mesh 对应的 skeleton
+```c++
+FReferenceSkeleton RefSkeleton;
+```
+TODO：这个 `RefSkeleton` 和它对应的 skeleton 的 `ReferenceSkeleton` 结构并不完全一样，为什么
 ### Animation Sequence
 对应 `AnimSequence` 类，每个 animation sequence 都有个指向 skeleton 的指针，表示这个 animation 和哪个 skeleton 关联的
+
+### Content Example
+接着看看 Content Example 的 basics 部分
+TODO：跳过了 1.2 节的 animation mirroring
+TODO：1.3 节的 root motion，为啥一个有 root motion，一个没有 root motion，如何根据 skeletal mesh 找到正在播放的动画，root motion data 从哪提取出来的
