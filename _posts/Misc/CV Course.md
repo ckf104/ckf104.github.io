@@ -26,7 +26,18 @@ object detection 中定义了 intersection over union(iou)，来评价 bounding 
 
 [Recall, Precision, AP, mAP的计算方法](https://blog.csdn.net/weixin_43646592/article/details/113998328) 对 map 讲得挺好，关键在于每个 bounding box 有个 confidence，先将结果数据按照 confidence 从大到小排序，然后绘制 precision 和 recall 的曲线，然后 [浅析经典目标检测评价指标--mmAP（一）](https://zhuanlan.zhihu.com/p/55575423) 也讲得很好。额外提到了计算 ap 时使用 precision 和 recall 曲线围成的面积需要进行一些调整，然后由于 map 依赖于 iou，因此还有 mmap 等等（对 iou 进行平均）
 
+### lec8
+pixel-wise cross entropy 会偏向于场景大的物体，因此会降低网络对小物体的识别能力。后续的 dice coefficients 处理的更好，它定义为
+$$
+Dice = \frac{2|A\cdot B|}{A^2+B^2}
+$$
+其中 $A$ 为预测分布，$B$ 为实际分布。[An overview of semantic image segmentation](https://www.jeremyjordan.me/semantic-segmentation/) 讲得很好，给出了具体的计算例子。我们会为每个类别计算一个 dice，然后取平均，可以看到 dice 的大小与 $B$ 中 1 的数目没有直接的关系，因此这个 loss 不会偏向于大的物体
+
+instance segmentation 是比 semantic segmentation 更难的一个任务，因为它区分在同一类别中的不同实例：对于一个 pixel，我不仅想要知道它的类别，还想要知道它属于哪个实例
+
 目前看到的一些：
+* lec9: diffusion model for zero-shot classifiers, spiking neural networks and spike cameras
+* lec8：vision language model, mask rcnn(instance segmentation)
 * lec7：video reasoning，objection detection
 * lec6：ok-robot(pick-and-drop tasks)，large video language model
 * lec5：learning transferable visual models from natural language supervision(什么玩意)，relation transformer for scene graph generation(什么玩意)
@@ -38,3 +49,7 @@ object detection 中定义了 intersection over union(iou)，来评价 bounding 
 * image segmentation
 * depth estimation(depth anything)
 * 3d reconstruction
+
+
+### Pre
+related work：Markov Random Field，superpixels
