@@ -107,7 +107,7 @@ FVector RelativeScale;
 FTransform USkinnedMeshComponent::GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace);
 ```
 TODO：virtual bone？
-TODO：bone proxy？在 animation sequence editor 中可以查看动画中每帧中每个 bone 的 local transform 和 reference transform 以及 mesh relative transform，local transform 就是相对父节点的 transform，reference transform 就是标准位姿下这个 bone 的 transform，那 mesh relative transform 是个啥玩意
+TODO：bone proxy？在 animation sequence editor 中可以查看动画中每帧中每个 bone 的 local transform 和 reference transform 以及 mesh relative transform，local transform 就是相对父节点的 transform，reference transform 就是标准位姿下这个 bone 的 transform，那 mesh relative transform 是个啥玩意, 在 content example 的 示例中，有 root motion 的动画里 root 的 mesh relative transform 在持续变化
 ### Skeletal Mesh
 对应 `USkeletalMesh` 类，它包含一个指向 skeleton 的指针，表示这个 mesh 对应的 skeleton
 ```c++
@@ -116,10 +116,19 @@ FReferenceSkeleton RefSkeleton;
 TODO：这个 `RefSkeleton` 和它对应的 skeleton 的 `ReferenceSkeleton` 结构并不完全一样，为什么
 ### Animation Sequence
 对应 `AnimSequence` 类，每个 animation sequence 都有个指向 skeleton 的指针，表示这个 animation 和哪个 skeleton 关联的
+TODO: additive layer tracks 是怎么弄的，感觉是在 animation sequence 上提供额外的 bone transform 的调整
 ### Animation Notify
-TODO：为啥 notify 有多个 track
-TODO：在 skeleton 中存 notify 和不在 skeleton 中存有啥区别
+notify track 没啥用，主要是让用户可以对 notify 做一个高层的分类，不至于把所有的 notify 都混到一个 track 上看着很乱了
+
+TODO：在 skeleton 中存 notify 和不在 skeleton 中存有啥区别，主要需要看看这些数据在 C++ 中是如何存储的
+TODO：sync marker notify 是怎么用的
 TODO：这个 trail notify state 做出来的特效我好喜欢，得好好看看
+
+编辑器编辑的 Animation Notify 对应 `FAnimNotifyEvent` 类，而实际执行 notify 工作的对应 `UAnimNotify` 以及 `UAnimNotifyState` 这些类，继承这些类可自定义新的 notify
+
+#### Montage Notify and Montage Notify Window
+主要是和蓝图中的 play montage 节点进行搭配的，montage notify 触发 On Notify Begin 回调，而 montage notify window 还会额外触发 On Notify End 回调。通过 notify name 参数区分是哪个 notify 触发的回调
+TODO：这个逻辑怎么通过 C++ 实现
 ### Animation Blueprint
 animation blueprint 中的节点也在源码中有相应对应，例如 Blendspace Player 对应为 `UAnimGraphNode_BlendSpaceGraph` 类，所有的 animation node 都继承自 `UAnimGraphNode_Base`，而 `UAnimGraphNode_Base` 是 `UK2Node` 的子类。每个 animation node 包含一个特定类型的 struct，这些 struct 都是 `FAnimNode_Base` 的子类
 
@@ -130,7 +139,7 @@ animation graph 中的 node 都包括 `On Initial Update`, `On Become Relevant`,
 
 TODO：文档 [Animation Node Functions](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-blueprint-node-functions-in-unreal-engine) 中介绍了许多 node function，没太看明白
 TODO：文档 [Animation Node Technical Guide](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-node-technical-guide-in-unreal-engine) 看起来是介绍如何自定义 animation node 的
-TODO：`FPoseLink` 类是拿来干嘛的，它和 `FComponentSpacePoseLink` 类有啥区别
+	TODO：`FPoseLink` 类是拿来干嘛的，它和 `FComponentSpacePoseLink` 类有啥区别
 #### State Machine
 始终有一个状态处于 active，整个 state machine 的 pose 输出即为当前 active 状态的 pose 输出。当 transition rule 满足时，新的状态标记为 active，此时系统的输出为原 active 状态和新 active 状态的 pose 输出的 blending，blending 曲线和 blending 时间可以在 transition rule 的配置中指定。如果新的 active 状态还没结束 blending 马上又要切换到下一个状态，这称为 interrupt，那么此时 state machine 的 pose 输出是三个 pose（原 active，被打断的 active，以及新的 active 态的 pose）进行 blending 的结果
 
@@ -140,40 +149,54 @@ TODO：`FPoseLink` 类是拿来干嘛的，它和 `FComponentSpacePoseLink` 类�
 
 TODO：transition rule 和 animation notify 的交互
 ### Animation Montages and Slots
-TODO：蒙太奇的播放是如何做 blending 的？
-TODO：slot node 的 `Always Update Source Pose` 选项是啥意思
+对应类 `UAnimMontage`
+TODO：蒙太奇的播放是如何做 blending 的？以及如何做 sync 的，因为 animation graph 中的 slot node 没有 group 相关的设置，文档 [Marker-Based Syncing](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-sync-groups-in-unreal-engine#marker-basedsyncing) 中提到 montage editor 中可以设置 sync group，但是又说它是针对 blend out 的？我们确实需要区分开 blending 的两种情况，一种是持续稳定的 blending，一种是 transition 阶段的 blending，这两种情况的 sync 方法是一致的吗。transition blending 的难点在于可能从一个动画的任何一个位置开始和另一个动画进行 blending，但其实根据具体情况，blend in 的动画也不总是需要从开头开始播，例如要从走路的动画过渡到跑，blend in 的动画从脚对齐的位置开始就行了
 TODO：为什么修改 montage 资产的 slot 分类从 default slot 到其它 slot 后动画预览窗口中就没有动画了呢，slot track 是个什么概念
-TODO：文档 [Animation Slots](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-slots-in-unreal-engine) 中讲要 slot group 可以是用来打断在同一个 group 中的 montage，如何理解
+TODO：文档 [Animation Slots](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-slots-in-unreal-engine) 中讲要 slot group 可以是用来打断在同一个 group 中的 montage，如何理解：同一个 slot group 中只能播放一个 montage
 TODO：在一个 montage 资产中创建多个 slot 有什么用，section 和 timing 又有什么用，看起来 section 是用来在 play 时指定开始位置的，如果不设置的话是默认从开始开始呢。然后 animation sequence editor 中右下角的 montage sections 是用来编辑这些 section 的播放顺序（只用于预览，还是说会对应到实际的 gameplay？）
 TODO：In the **Anim Graph** within a character's **Animation Blueprint**，Slots can be used to organize which region on a character an animation is played back on. 从文档中的意思 slot 其实表示了 mesh 的一部分，它具体表示的哪一部分，这个信息存储在哪的呢
-
-对应类 `UAnimMontage`
+TODO：animation blueprint 中的 slot node 的 `Always Update Source Pose` 选项是啥意思
 #### Montage Section
 #### Slot
 
 ### Animation Blending
+blending 时动画会正常播放（不论是正在 blend in 还是 blend out 的动画）
+TODO：那比如在一个动画播到一半时开始插入 montage，这样一个动画的中间部分和一个动画的开始部分进行 blend 如何对齐呢？
 #### Blending Node
 TODO：文档 [Blend Nodes](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-blueprint-blend-nodes-in-unreal-engine?application_version=5.4) 中介绍了 animation blueprint 中可以使用的各种 blend 模式
 
 相比对最终的顶点进行 blending，显然逐关节的变换进行 blending 更合适，这样过渡会更加自然
 TODO：apply additive 节点和 apply mesh space additive 节点，这个加法要怎么做呢，[ozz-animation samples](https://guillaumeblanc.github.io/ozz-animation/samples/) 中有做 additive animation 的例子，很有必要看看。另外 mesh space vs local space，看起来 local space 其实就是 bone space，而 mesh space 就是 model space，apply additive 和 apply mesh space additive 分别适用于 local space additive animation 和 mesh space animation，类似地 layered blend per bone 而也有 Mesh Space Rotation Blend 和 Mesh Space Scale Blend 选项，我尤其关心计算细节，需要看看源码，用公式把这个 blending 表示出来
 * 我实际试了一个例子，在三人称模板中用 layered blend per bone 混合 base pose 为 idle 的第 0 帧和 base pose 0 为 run fwd 第 0 帧，感觉开启 Mesh Space Rotation Blend 选项后的结果更符合预期。应该说，开启该选项后，混合后的结果更贴近单纯 run fwd 输出的结果。我目前的解释是因为 Mesh Space 的混合会考虑父节点的效果。例如我设置从关节 spine_02 开始混合，如果为 local space 的混合，那么在 spine_02 处混合后，最终 spine_02 的关节的矩阵应该还有乘以父节点等等的旋转结果，但是由于是从 spine_02 开始混合的，它以上的变换完全丢失了，因此最终看到的结果差异很大，但如果是 mesh space 的混合，是先算出 spine_02 在 mesh space 下的变换矩阵再进行混合，由于这个变换矩阵已经考虑过 spine_01 这些父关节的变换了，因此得到了一个与原来的位姿更接近的结果
-* 但上面的理解无法解释为什么我开启 Mesh Space Rotation Blend 后，将 blend 的关节从 spine_02 下调到 spine_03 后，动画中人物手的位置发生了移动。因为根据上面的理解，节点的 mesh space 变换矩阵不依赖于设置的混合的位置才对
+* 但上面的理解无法解释为什么我开启 Mesh Space Rotation Blend 后，将 blend 的关节从 spine_02 下调到 spine_03 后，动画中人物手的位置发生了移动。因为根据上面的理解，节点的 mesh space 变换矩阵不依赖于设置的混合的位置才对。我现在的理解是 手是只发生了移动，即只有 translation 变了，但 rotation 没有变，因此没有矛盾的地方，也许这里还需要细看源码，关注 translation 是怎么算的（动画蓝图中的一个 pose 对应到 C++ 代码是怎么样的
 * 另外一个问题，我将 layered blend per bone 中的 bone 设置为 root，且 blend pose 0 的权重设置为 1，得到的结果就和 blend pose 0 完全一样了。这个应该还好理解，这说明它就是做一个纯粹的 blend，而不是 additive 那种，所以权重设置为 1 就表示完全地使用 blend pose 0 的结果
 * layered blend per bone 的 Curve Blend Option 选项是怎么用的
 #### Blending Space
 TODO：理解 2D blending space
+TODO：文档 [Blend Spaces in Animation Blueprints](https://dev.epicgames.com/documentation/en-us/unreal-engine/blend-spaces-in-animation-blueprints-in-unreal-engine?application_version=5.4) 中谈到的 blend space graph 是个什么玩意
+TODO：blend space 是怎么做 blending 的，主要是 sync group 相关的设置没办法影响 blend space，但测试三人称模板的 walk run blend space 1d 确实在 blending 时用了 walk sequence 和 run sequence 中的 sync marker
 #### Sync Group
 TODO：感觉文档 [Sync Groups](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-sync-groups-in-unreal-engine) 是讨论对 blending 进行细粒度的控制的
 TODO：animation notify 中有一类是 sync marker，在 MM_Run_Fwd 中出现了，这是干嘛的
 #### Additive Animation
 TODO：添加 section 时显示 Animation Asset  MM_Land has an additive type AAT_LocalSpaceBase that does not math the target AAT_None 是什么意思
 Animation Sequence 的 AdditiveAnimType 设置有 None，Local Space，Mesh Space 这三个选项，而对于 MM_Land 这个 Local Space 的 additive animation 而言，它有 Base Pose Type 和 Ref Frame Index 这些选项，这些选项都是啥含义
+TODO：ue 里面没有 additive animation sequence 这种概念，它只有 animation sequence，然后可以选择一个 ref pose，将 animation sequence 与 ref pose 做差得到 additive pose，这里的细节是怎样的？然后这个需要控制 blending 时间的同步吗
 ### Data in Animation Sequence
 TODO: 根据文档 [Animation Curves](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-curves-in-unreal-engine)，curve 的名称是存在 skeleton 里的，那 curve 的值呢？我觉得是放在 animation sequence 里的。那不同的 animation sequence 用同一个 curve 名称，但可以有不同的值吗？为啥要这样设计
 TODO: 我在 animation blueprint 中使用 animation curve 为啥总是返回 0 呢？应该如何使用 animation curve？本来这也很奇怪，在 animation sequence 中定义 curve 的值，但是 animation blueprint 又不与单一的 animation sequence 进行绑定，它怎么知道该用哪个 curve 呢
-### Control Rig
+### Control Rig and IK
+TODO：games104 第 9 讲讨论 two bone IK 时，为了解决多解性的问题，让动画设计师指定一个 reference vector，reference vector 的含义是什么，并且这假定了人上下台阶时总是向前的，侧身移动应该怎么办？以及示意图都是二维的，解出来的结果没有考虑轴的翻滚，这个翻滚旋转角度应该怎么取合适呢
 TODO：什么是 control rigs，第三人称模板中是如何做到动画紧贴地面的（依据人物所处的环境，动画实际的骨骼参数略有不同）
+TODO：看看与 skeleton control 相关的一系列 animation graph node
+TODO：这玩意和 [IK Rig](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-ik-rig?application_version=5.4) 的区别和联系是什么
+TODO：two bone ik 在求解时选择的位姿是 ref pose，而不是 current pose，为什么
+TODO：看看 [Control Rig: An axes-agnostic Basic IK Solver](https://alessandrotironigamedev.com/posts/2024/04/21/control-rig-an-axes-agnostic-basic-ik-solver/) 是怎么实现一个不需要 primary and secondary axes 的 solver 的
+#### Initial, Current, and Offset Transform
+编辑器中展示 control rig 有 initial, current 以及 offset 这三种 transform。我感觉 offset transform 稍微有些鸡肋。我们假定这些 transform 的调整都是在 local space 里进行（直接手动编辑 global space 感觉有些问题）。那么 control 输出的 transform 为 `current * offset * parent`，注意 ue 里左乘的矩阵是优先施加的变换
+注意，不要用 control 去控制它的祖先骨骼，否则结果的表现也会很奇怪（因为祖先骨骼的变换改变了，又会反过来影响 control 的变换）
+### Root Motion
+TODO
 ### Skeletal Mesh LOD
 TODO：文档 [Skeletal Mesh LODs](https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-lods-in-unreal-engine?application_version=5.4)
 ### Content Example
