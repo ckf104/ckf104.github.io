@@ -107,11 +107,6 @@ scene component 的 `MoveComponentImpl` 实现很简单，因为它处理的是�
 primitive component 额外考虑了物理碰撞的因素，如果 `bsweep` 为 true，那么它会考虑沿途上所有可能的碰撞，最终的位置是停在第一个发生碰撞的位置处。然后调用 `InternalSetWorldLocationAndRotation` 设置更新 component 的位置和旋转
 
 对比这几个 API 函数，`AddLocalOffset`, `AddRelativeLocation`, `AddWorldOffset`，它们的主要区别在于移动的坐标系参考不同，第一个是相对于物体自身的局部坐标系，第二个是相对于 parent component 的局部坐标系，第三个是相对于 world space 的坐标系。[Coordinate System and Spaces](https://dev.epicgames.com/documentation/en-us/unreal-engine/coordinate-system-and-spaces-in-unreal-engine) 告诉我们，在编辑器界面点击右上角的图标可以切换 local 和 world space 视图。
-
-TODO：在实际测试 primitive component 时观察到的几个现象
-* 如果 `bsweep` 为 false，在碰撞到物体后还发生了转动（这看起来更加真实），但我没理解这个转动是如何发生的，我猜测应该和 overlap 的检测有关，就是 UpdateOverlaps 相关的函数，但不太确定。而 `bsweep` 为 true 时则不会有转动（我猜测是因为它是缓缓扫过去的，因此不会像 `bsweep` 为 false 时穿到内部去然后再根据 overlap 机制弹出来了）
-* 如果 `bsweep` 为 true，且有重力和物理碰撞，cude 移动时会直接与地板碰撞，导致 cude 没法移动，一个相同问题的帖子 [Moving objects with sweep enabled not working if they are touching the floor and gravity enabled](https://forums.unrealengine.com/t/moving-objects-with-sweep-enabled-not-working-if-they-are-touching-the-floor-and-gravity-enabled/1814530)，但没人回复。但我发现如果移动的方向稍微向上一点（z > 0），就能够动起来了，不知道 UE 里面是咋搞的
-TODO：skeletal mesh component 的 `MoveComponentImpl` 实现
 ```c++
 /** What we are currently attached to. If valid, RelativeLocation etc. are used relative to this object */
 UPROPERTY(ReplicatedUsing = OnRep_AttachParent)
