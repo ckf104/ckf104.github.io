@@ -296,8 +296,10 @@ ADJCENCY 后缀的 primitive 是为 geometry shader 提供额外的相邻 primit
 
 Geometry Shader 中新生成的 primitive 的顶点属性是怎么弄的？看起来是要在 Geometry Shader 中接收 Vertex Shader 中的输出，然后 Geometry Shader 中自己输出新的 attribute，这个再由 Fragment Shader 接收（**重点就是 Fragment Shader 的 input 不再来自 Vertex Shader 了**）
 
-TODO：https://www.khronos.org/opengl/wiki/Geometry_Shader，关注 Instanced GS 和 Transform Feedback
+由于 geometry shader 位于 vertex shader 之后，如果把 projection 放在 vertex shader 里，geometry shader 就得处理非线性的数据了，可能造成一些
+不便，所以如果使用 geometry shader 的话，通常会把 projection 放在 geometry shader 中进行处理
 
+TODO：https://www.khronos.org/opengl/wiki/Geometry_Shader，关注 Instanced GS 和 Transform Feedback
 ## Resource View
 
 **TODO：关注一下 glTextureView 函数，这和 ue 里面的 resource view 感觉差不多**
@@ -313,7 +315,7 @@ TODO：https://www.khronos.org/opengl/wiki/Geometry_Shader，关注 Instanced GS
 ### Multisample fragment operations
 
 ### Stencil test
-
+注意 stencil test 在 depth test 前面
 ### Depth test
 
 ### Blending
@@ -339,4 +341,5 @@ TODO：目前最关心的一些关键点
 * 整个看看 opengl programming guide，看看还有没有感兴趣的点
 * **最后，games201**
 * [RTX GPU Ray-Tracing](https://developer.nvidia.com/rtx/ray-tracing)，以及集成在 Vulkan 和 DX 中的 API
+* TBR 为什么能减少带宽消耗？以及 [猴子也能看懂的渲染管线](https://zhuanlan.zhihu.com/p/137780634) 中谈到 Tessellation Stage 可以用来做 Displacement Mapping，了解一下
 
