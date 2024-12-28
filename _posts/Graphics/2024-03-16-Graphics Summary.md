@@ -135,8 +135,11 @@ TODO
   $$
   L_o(p,w_o) = L_e(p,w_o)+\int_{H^2}L_i(p,w_i)f(p,w_i,w_o)(n\cdot w_i)dw_i
   $$
-  
-
+  渲染方程中我比较困惑的一点是对输入的刻画是一个垂直于平面的能量项  $L_i(p,w_i)(n\cdot w_i)$，但是输出却是一个任意方向的 radiance，当然这可能不是本质的，因为也可以把 $n\cdot w_i$ 吸收到 $f(p,w_i,w_o)$ 中。不过最奇怪的还是能量守恒项的描述
+  $$
+  \int_{w_o} f(p,w_i,w_o) cos\theta_o dw_o \le 1
+  $$
+  它的推导是认为输出的能量大小是 $L_o(p,w_o)*cos\theta_o$，那与平面平行的那部分 radiance 从哪来的，从输入的与平面平行的 radiance 中来的吗，那为什么没有体现出这部分约束呢？
 ### Path Tracing
 
 为了求解渲染方程，首先是用蒙特卡洛方法估计积分，取一个分布在 $[a,b] 上的$随机变量 $X$ 和它的概率密度函数 $pdf(X)$，那么我们为求 $\int_a^b{f(x)}$ ，我们有
