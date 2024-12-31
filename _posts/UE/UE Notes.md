@@ -59,6 +59,10 @@ $ ./Engine/Build/BatchFiles/RunUBT.bat  UnrealEditor Development Win64 -Mode=Gen
 ```
 
 * 在 windows visual studio 中需要设置 editor preference 为 vs2022，详见[VisualStudio 2022 Intellisense for engine files not working in UE5](https://forums.unrealengine.com/t/ue-5-1-visualstudio-2022-intellisense-for-engine-files-not-working-in-ue5/551166)
+* 如果安装了多个 UE 版本的话，在 windows 上右键 uproject 文件 generate project file 时，会 [找不到 UnrealBuildTool](https://forums.unrealengine.com/t/missing-unrealbuildtool-exe-after-build/242198)，根据 [Generate VS Project Files by Command Line](https://forums.unrealengine.com/t/generate-vs-project-files-by-command-line/277707)，在命令行使用（如果使用的是 launcher 的二进制版本的话）
+```
+"C:\Program Files (x86)\Epic Games\Launcher\Engine\Binaries\Win64\UnrealVersionSelector.exe" /projectfiles "MyProject.uproject"
+```
 
 ## UE Reflection and GC
 
