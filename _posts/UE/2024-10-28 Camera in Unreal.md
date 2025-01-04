@@ -17,6 +17,8 @@ static ENGINE_API const FName SocketName;
 而它重载的 `GetSocketTransform` 方法返回的不再是自己的 `ComponentToWorld` 成员，而是由 spring arm 的端点的坐标和旋转构成的 `FTransform`，因为通常 spring arm 会挂一个 camera component 作为子节点，而通常 camera component 不会还相对于父节点做旋转变换，而 camera component 的 `GetCameraView` 方法使用 camera component 的位置和旋转设置 `ViewTarget.POV`，这使得最终 spring arm 返回的 `GetSocketTransform` 作为相机的位置和旋转
 
 spring arm 的核心逻辑在 `UpdateDesiredArmLocation` 函数中，这个函数在每个 tick 都会被调用。它负责对相机位置进行更新，其中调用 `GetTargetRotation` 函数获取旋转朝向，当 `bUsePawnControlRotation` 为 true 时，使用 controller 的 control rotation，否则使用 spring arm 自身的旋转朝向（这通常不是第三人称视角所希望的控制，因为 spring arm 通常会 attach 到 pawn 身上，pawn 旋转之后它跟着转，容易把玩家转晕了）。另外 `UpdateDesiredArmLocation` 还会处理障碍物检测以及相机方位，朝向的渐变等逻辑（这里的渐变和 player camera manager 中的渐变有些区别，player camera manager 中的渐变是处理 view target 的切换）
+#### Lagging
+有时候人物的位置，或者旋转方向发生迅速的变化，我们不希望摄像机也跟着迅速变，否则画面看着就很晕。一个典型的例子是人物上台阶，上一个台阶的时候，人物在 z 轴的位置会迅速变化，如果摄像机始终对准人物的话，会导致画面抖动。因此 spring arm 的 `bEnableCameraLag` 和 `bEnableCameraRotationLag` 参数控制是否启用 location 和 rotation 的 lagging，而 `CameraLagSpeed` 和 `CameraRotationLagSpeed` 指定摄像机位置和朝向变化的最大速度
 
 对于第三人称视角，如果使用 spring arm + camera component 的设置，应该将 spring arm 的 `bUsePawnControlRotation` 设置为 true，而 camera component 的 `bUsePawnControlRotation` 值设置为 true/false 都不影响。因为不论 camera component 的此字段是 true 还是 false，只要 spring arm 的此字段为 true，最终相机的旋转方向就会与 controller 的 control rotation 一致。如果把 spring arm 和 camera component 的此字段值都设置为 false，那表现就是上面提到的 camera 跟着 pawn 一块转。但如果是 spring arm 的此字段值设为 false，而 camera component 为 true，最终的表现就会很奇怪。主要的原因在于此时 spring arm 的 rotation 是跟着 pawn 走的，如果移动时改变了朝向，那 spring arm 的朝向也跟着改，使得 camera 的位置发生大幅变化，但 camera 的 rotation 又没变，这操作起来就很奇怪了
 #### Target Offset vs Socket Offset
