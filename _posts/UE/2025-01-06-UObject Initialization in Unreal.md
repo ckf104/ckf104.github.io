@@ -63,8 +63,8 @@ mutable FOverrides SubobjectOverrides;
 * 在 `StaticAllocateObject` 分配的内存上调用该 object 的构造函数，同时初始化新的 `FObjectInitializer`，将这个 object initializer 推到 `FUObjectThreadContext` 这个全局单例的 `InitializerStack` 的栈顶
 * 在 `FObjectInitializer` 的析构函数中，会把自己从栈顶弹出，然后调用 `PostConstructInit` 函数
 * 在 `PostConstructInit` 函数中
-	* 会对结束构造的 obj 调用 `InitProperties`，来 copy CDO 中的一些数据到当前的 obj 里（TODO：这是什么，怎么做到的，一些数据例如在编辑器中修改了 CDO 的值的，我可能希望使用 CDO 中的数值，而另一些我可能希望使用构造函数中设置的，例如我有一个全局计数器，然后每次构造函数将计数器加 1 再赋值给一个成员，我当然不希望 CDO 用自己的值把我的值给覆盖了）
-	* 对当前的 obj 调用完 `InitProperties`，又调用 `InitSubobjectProperties` 函数，这个函数又对这个 obj 的所有 sub object 调用 `InitProperties`（TODO：为什么？）
+	* 会对结束构造的 obj 调用 `InitProperties`，来 copy CDO 中的一些数据到当前的 obj 里
+	* 对当前的 obj 调用完 `InitProperties`，又调用 `InitSubobjectProperties` 函数，这个函数又对这个 obj 的所有 sub object 调用 `InitProperties`
 	* 然后又对每个 sub obj 调用 `PostReinitProperties`
 	* 对当前的 obj 调用 `PostInitProperties`
 `CreateDefaultSubobject` 的流程是类似的，核心的构造也是通过 `StaticConstructObject_Internal` 完成的，只是在调用 `StaticConstructObject_Internal` 前会在当前的 object initializer 中查找这个需要构造的 default sub object 是否有被重载了，另外在调用 `StaticConstructObject_Internal` 后会将返回的 sub object 加入到 object initializer 的 `ComponentInits` 字段中，这样在 object initializer 的析构函数中通过遍历 `ComponentInits`，就能对每个 sub object 调用上面提到的 `InitProperties` 等函数了
