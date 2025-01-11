@@ -1,3 +1,12 @@
+---
+title: Microfacet Theory and Torrance–Sparrow BRDF
+math: true
+date: 2024-08-24 15:47:39 +0800
+comments: true
+categories:
+  - Graphics
+---
+
 ## Basic Idea
 
 使用镜面反射，但是每个点不是单一的法线了，而是一个微表面，这个微表面存在一个法线分布，这个法线分布是一个围绕 macro surface 的法线的扰动。扰动的大小由 roughness 这个参数决定，roughness 越大，这个分布离标准的 macro surface 法线分布 $\delta(w-n)$ 偏差越大

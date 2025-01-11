@@ -1,5 +1,13 @@
-这是 pbrt4 第二章的阅读笔记
+---
+title: Monte Carlo Integration
+date: 2024-07-28 8:46:21 +0800
+math: true
+comments: true
+categories:
+  - Graphics
+---
 
+这是 pbrt4 第二章的阅读笔记
 ## Basic Idea
 
 为了计算积分 $\int_\Omega f(\boldsymbol{x})d\boldsymbol{x}$，我们可以基于区域 $\Omega$ 上的概率分布 $p$ 对区域 $\Omega$ 进行 $n$ 采样，采样均值 $F_n$ 是积分结果的无偏估计

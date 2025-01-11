@@ -1,3 +1,12 @@
+---
+title: Radiance, Luminance and Color Space
+date: 2024-10-09 18:14:25 +0800
+comments: true
+math: true
+categories:
+  - Graphics
+---
+
 ## Solid Angle
 
 总结一下立体角，主要参考 [立体角とガウスの発散定理](https://hooktail.sub.jp/vectoranalysis/GaussSolidAngle/)

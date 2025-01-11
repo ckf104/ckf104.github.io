@@ -1,3 +1,12 @@
+---
+title: Path Tracing
+date: 2024-09-24 19:34:05 +0800
+math: true
+comments: true
+categories:
+  - Graphics
+---
+
 我们讨论 PBRT4 的第 13 章 Simple Path Tracer 和 Path Tracer 的实现
 ## Overview
 

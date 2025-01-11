@@ -1,3 +1,12 @@
+---
+title: Volumetric Path Tracing
+date: 2022-10-05 20:17:00 +0800
+math: true
+categories:
+  - Graphics
+comments: true
+---
+
 系统的复杂度主要来源于两点
 * heterogeneous  --> $\sigma_a$ 等参数依赖于位置
 * chromatic --> $\sigma_a$ 等参数依赖于波长
@@ -117,7 +126,7 @@ r_u = \frac{P_u(\boldsymbol{p}|\lambda)}{P_{path}(\boldsymbol{p}|\lambda_1)},r_l
 其它已经在 13 章使用过的 tricks，例如 allowIncompeletePDF(MIS Compensation)，path regularization 等，在这里仍然适用
 ## 对 Sampler 的讨论
 
-pbrt4 中在 Sampler 以及 path tracing 这两章强调过不能把 sampler 的采样放到条件语句中。主要是为了保证一个固定的积分维度使用固定的 sampler 采样的维度，充分利用好 sampler 返回的均匀采样点的良好性质。但在 `VolPathIntegrator::Li` 中，`SampleLd` 函数中使用了三维的 sampler 的返回值来采样光源，但这个函数却被放在下面的条件语句中
+pbrt4 中在 8.3 节以及 13.4 节这两章强调过不能把 sampler 的采样放到条件语句中。主要是为了保证一个固定的积分维度使用固定的 sampler 采样的维度，充分利用好 sampler 返回的均匀采样点的良好性质。但在 `VolPathIntegrator::Li` 中，`SampleLd` 函数中使用了三维的 sampler 的返回值来采样光源，但这个函数却被放在下面的条件语句中
 ```c++
 if (IsNonSpecular(bsdf.Flags())) {
     L += SampleLd(isect, &bsdf, lambda, sampler, beta, r_u);
