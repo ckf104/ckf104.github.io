@@ -251,13 +251,16 @@ void FObjectPropertyBase::InstanceSubobjects(void* Data, void const* DefaultData
 从上面的这些表现我们可以总结出 instanced uproperty 是干嘛的了，它不会自动地帮我们进行 deep clone（但是在构造函数中默认创建的对象需要是 instanced uproperty），而是用来表达外面的对象对这个 instanced uproperty 的主权，使得在序列化时可以一起序列化，并且可以在编辑器中 instanced uproperty 引用的 uobject 的 uproperty
 
 TODO：看看为什么 UI 部件中大量使用 `Instanced` 标记
-### Post Initialization
+#### Post Initialization
 最后还有两个 uobject 的回调函数
 * `UObject::PostInitProperties`
 * `UObject::PostReinitProperties`
 当 uobject 完成的前面一系列的初始化后，`FObjectInitializer::PostConstructInit` 会调用构建出的 uobject 的 `PostInitProperties` 回调，以及对该 uobject 的 default subobject 调用 `PostReinitProperties`
 
 例如 actor component 重载了 `PostInitProperties` 方法，将自己加入到 owner actor 的 `OwnedComponents` 字段中
+### Object Duplication
+流程梳理 `StaticDuplicateObjectEx`
+* uobject 的 `PreDuplicate` 虚函数回调
 
 
 TODO：uobject 的管理与内存分配
