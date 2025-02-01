@@ -167,7 +167,6 @@ struct FSchemaHeader
 FORCEINLINE static void HandleBatchedReference(FWorkerContext& Context, FResolvedMutableReference Reference, FReferenceMetadata Metadata);
 FORCEINLINE static void HandleBatchedReference(FWorkerContext& Context, FImmutableReference Reference, FReferenceMetadata Metadata);
 ```
-
 TODO：batch 在多线程的背景下是否尤其重要呢？我其实不太理解这里的 batch 有什么好处
 ##### Multi-Thread RA
 我们接下来讨论 RA 是如何多线程进行的。核心要义是，每个线程都有一个自己的 `FWorkerContext`，前面提到 RA 开始时会收集到 initial objects，UE 会把这些 initial objects 均分给各个 `FWorkerContext`，每个线程就从自己分配到的 initial objects 开始遍历引用关系
@@ -192,6 +191,12 @@ struct alignas(PLATFORM_CACHE_LINE_SIZE) FWorkerContext
 `FWorkBlockifier ObjectsToSerialize` 是多线程负载均衡的重要组成部分，因为均分 initial objects 显然不能保证每个线程的工作量是一致的。它是一个 lock free 的 work stealing queue。队列中每个元素是 `FWorkBlock` 类型，这个 block 中包含 512 个待遍历引用的 objects。当一个线程遍历完自己的 objects 的引用后，它就会偷取其它线程的 `FWorkBlock`
 
 另外，Slow ARO 也和多线程负载均衡有些关系。ARO 函数如果使用 Slow ARO 标记了，说明该函数跑得比较慢，在遍历 reference schema 时如果遇到了 `EMemberType::SlowARO`，不会马上调用对应的 ARO 函数来收集应用，而是将该 ARO 函数加入到 `FSlowAROManager` 的全局单例中。在线程完成自己的工作，除了偷取其它线程 `FWorkBlock`，也可能向 `FSlowAROManager` 的全局单例偷取待调用的 Slow ARO
+##### Update
+[UE4 垃圾回收（二）GC Cluster](https://zhuanlan.zhihu.com/p/133293284) 中对 cluster 销毁时为什么向上递归的分析很有启发性。我发现上面叙述的引用置空逻辑只适用于不属于任何 cluster 并且不是某个 cluster 的 mutable objects 的 object 被标记为 garbage 的情况，对于 object 是 cluster root 或者 cluster 的 mutable objects 时，UE 实际上做了一些额外的处理。这是因为这些 objects 可能被 cluster 中的某个 obj 引用，而在引用遍历时根本就不会处理 cluster 中的 obj
+
+因此为了保证能够将 cluster objects 的指向 garbage 的引用也置空，我们需要对上面的引用置空逻辑叙述打额外的两个补丁
+* 指向 cluster root 的引用可能来自任何引用该 cluster 的 cluster 中的 obj。因此在 StartReachabilityAnalysis 阶段遍历 cluster 数组时，就会判断该 cluster root 是否是 garbage，如果是的话，就递归地将该 cluster，以及所有直接或间接引用该 cluster 的 cluster 都销毁掉
+* 指向 mutable objects 的引用来自本 cluster 的 obj。在 processor 的 `HandleValidReference` 处理引用时，将 cluster 的 mutable objects 都加入到 `FWorkerContext` 的 `ObjectsToSerialize` 中之前，它会检查每个 mutable objects 是否是 garbage，如果是，会将该 cluster 的 `bNeedsDissolving` 设置为 true，并且将 cluster 中所有的 obj 都加入到 `ObjectsToSerialize` 中，因此后续将遍历 cluster 的所有 objects 来将指向 mutable objects 的引用置空
 ### Purge
 最后我们讨论 GC 的 Purge 阶段。这个阶段由 `PostCollectGarbageImpl` 函数实现，它做了下面的事情来回收不可达的 objects
 1. 首先是交换 `GUnreachableObjectFlag` 和 `GMaybeUnreachableObjectFlag`，那么之前没有访问到的 object 都被标记上了 unreachable
@@ -258,3 +263,4 @@ TODO：解释下面的
 	FIterationTimerStat UnhashingTime;
 	FIterationTimerStat DestroyGarbageTime;
 ```
+TODO：看看 [UE4 垃圾收集大杂烩](https://zhuanlan.zhihu.com/p/219588301)
