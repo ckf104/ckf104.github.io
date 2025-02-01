@@ -76,27 +76,6 @@ UPackage* UObjectBaseUtility::GetPackage() const
 	}
 }
 ```
-### Garbage Collection
-这一节我们讨论 UE 的 GC 机制，我对 GC
 
-GC 的入口函数 `CollectGarbage` 或者 `TryCollectGarbage` 应该总是从 game thread 发起的。这很好理解，如果 GC 从其它线程发起，同时 game thread 还在自由地对 uobject 进行修改，这就发生竞争了。那么反过来说，我们通常也不能在其它线程上对 uobject 进行修改。如果确实有必要，例如 async package loader，需要在修改前持有 GC 锁，来避免与 GC 发生竞争
 
-GC 锁，也即 `FGCCSyncObject` 这个全局单例，可以大概看作是一把读写锁。读者通过定义一个 `FGCScopeGuard` 以 RAII 的方式获取读者锁，而写者调用 `AcquireGCLock` 来获取写者锁
 
-TODO：需要弄明白下面的问题
-* 增量 GC 如何实现？虽然有 TObjectPtr 带来的写屏障，但那些 pre gc delegate 的，以及通过 add reference object 回调来添加引用的是怎么处理的
-* 多线程 GC 大概是个什么思路
-* gc 是如何将引用置空的，哪些引用会被置空，mark pending kill 的功能是什么，object 的销毁流程是怎样的
-* cluster gc 是怎么做的
-* TObjectPtr 在编辑器下的 lazy loading
-
-UObject 的 `AddReferencedObjects` 静态函数存储在对应 uclass 的 `CppClassStaticFunctions` 中
-例如 ulevel 的 `AddReferencedObjects` 函数将 level 中所有的 actor 加入到引用中，而 actor 的 `AddReferencedObjects` 函数将自己的所有 component 加入到引用中
-uobject 的 ARO 可以通过 `UE::GC::RegisterSlowImplementation` 标记为 slowARO，通过 `FSlowAROManager` 这个全局单例来管理
-
-TODO：测试 FGCObject 的 ARO 不会在建立 cluster 寻找引用时调用？
-#### Object Cluster
-cluster root 的 outer，class 也会加入到这个 cluster 中
-
-**TODO：看看 [UE4 垃圾回收（二）GC Cluster](https://zhuanlan.zhihu.com/p/133293284)，解释 `ClusterRootIndex`**
-**TODO：[用UObjectHashTables管理UObjectHash](https://zhuanlan.zhihu.com/p/464960701) 中写道UObjectBase::EmitBaseReferences中有专门对Outer生成Reference 来保证 object 在的时候它的 outer 就不会被 gc，看完 GC 后再理解一下这段话**
