@@ -50,9 +50,27 @@ TODO：理解 widget tree 为啥是 `INamedSlotInterface` 的子类
 player controller 三剑客 HUD，camera manager 和 input component。我也没咋看明白 `AHUD` 类本身有啥东西，一般可能我们自己继承这个类，然后在这个类里面添加管理 widget 的逻辑吧
 ### Interaction with Others
 要动态修改 UI 的内容，一种是获取到 widget 的引用，然后直接修改。另外一种是使用 [property/function binding](https://dev.epicgames.com/documentation/en-us/unreal-engine/property-binding-for-umg-in-unreal-engine)。function binding 的开销显然是最大的，因为每帧都会调这个蓝图函数。我不太确定 property binding 的开销如何
-感觉用得最广泛的还是 event driven update。其实本质上就是直接进行修改，只是说现在绑定在了一个 delegate 上，每次变量值被修改了就只需要广播一下就好了。例如我需要显示 character 的生命值，那就额外地有一个 `OnHealthChaned` 多播代理，然后绑定一个修改 UI 的回调就好了
+感觉用得最广泛的还是 event driven update。其实本质上就是直接进行修改，只是说现在绑定在了一个 delegate 上，每次变量值被修改了就只需要广播一下就好了。例如我需要显示 character 的生命值，那就额外地有一个 `OnHealthChanged` 多播代理，然后绑定一个修改 UI 的回调就好了
 
-TODO：了解 property binding/function binding 的实现
+TODO：了解 property binding/function binding 的实现，如何声明哪些变量是可以绑定的，在 C++ 的 UProperty 声明咋看不出来呢
+### Implement Widget Logic in C++
+我们可以在编辑器中可视化地调整布局，然后在蓝图编辑中编写相应的响应逻辑，但蓝图中的逻辑运行效率较低。也可以继承 `UWidget` 和 `UUserWidget` 类，用 C++ 直接定义 UI 布局和 UI 逻辑。但这样就失去了可视化布局的优势了。bind widget 方法就是将两者的优势结合起来
+
+TODO：meta bindwidget bindwidget optional
+bindwidgetanim transient
+### Widget Animation
+TODO：试试 UI 动画
+
+### Initialization Timing
+user widget 中定义的下列初始化函数的调用时机是怎样的，和蓝图中的 PreConstruct，Construct，Event On OnInitialized 等的关系是什么
+```c++
+UMG_API virtual void NativeOnInitialized();
+UMG_API virtual void NativePreConstruct();
+UMG_API virtual void NativeConstruct();
+UMG_API virtual void NativeDestruct();
+UMG_API virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime);
+```
+### TODO: Owner 的影响，UserWidget 的 Owner 设置为 PlayerController 时会在切换关卡时挂掉，Owner 设置为 GameInstance 是不是就好了
 ### Anchor
 因为我们通常设计 UI 时，总需要一个参考的屏幕的屏幕分辨率来将其可视化。anchor 这个概念要解决的问题是当屏幕分辨率变化时，如何确定新的 UI 布局。首先我们定义什么是 UI 布局：我们使用一个矩形来标定 UI 元素的位置。给定长宽的画布，我们清楚了每个 UI 矩形在画布中的位置和大小，那么就清楚了 UI 布局
 
@@ -89,5 +107,3 @@ TODO：解释这个布局，通过 slot，我们有子节点的 desired size，�
 TODO：解释它与 rendering 子系统如何交互
 ### Input
 TODO：解释它如何接收 input，以及如何与 enhanced input 系统协作
-### Animation
-TODO：试试 UI 动画
