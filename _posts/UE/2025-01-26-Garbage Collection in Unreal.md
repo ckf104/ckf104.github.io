@@ -1,3 +1,11 @@
+---
+title: UObject Initialization in Unreal
+comments: true
+categories:
+  - UE5
+date: 2025-01-26 12:17:00 +0800
+---
+
 ### Overview
 GC 的入口函数 `CollectGarbage` 或者 `TryCollectGarbage`，总是从 game thread 发起。这很好理解，如果 GC 从其它线程发起，同时 game thread 还在自由地对 uobject 进行修改，这就发生竞争了。那么反过来说，我们通常也不能在其它线程上对 uobject 进行修改。如果确实有必要，例如 async package loader，需要在修改前持有 GC 锁，来避免与 GC 发生竞争
 
