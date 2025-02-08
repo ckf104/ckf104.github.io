@@ -1,5 +1,5 @@
 ---
-title: UObject Initialization in Unreal
+title: Garbage Collection in Unreal
 comments: true
 categories:
   - UE5
