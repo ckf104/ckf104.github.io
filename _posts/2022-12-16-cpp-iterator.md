@@ -165,11 +165,11 @@ int main()
 
 > Each C++ [expression](https://en.cppreference.com/w/cpp/language/expressions) (an operator with its operands, a literal, a variable name, etc.) is characterized by two independent properties: a *[type](https://en.cppreference.com/w/cpp/language/type)* and a *value category*. Each expression has some non-reference type, and each expression belongs to exactly one of the three primary value categories: *prvalue*, *xvalue*, and *lvalue*.
 
-虽然我并不赞同`Each expression has some non-reference type`这个说法（参考[Scott Meyers: Expressions can have Reference Type](http://scottmeyers.blogspot.com/2015/02/expressions-can-have-reference-type.html)）。因此我们说的左值右值，其实是在判断表达式的`value category`，而不是`type`。“右值引用是左值”这句话更严谨的表达是“单独由一个右值引用类型组成的表达式的`value category`是一个左值（虽然表达式的类型依然是右值引用）”。这也来源于[Value categories](https://en.cppreference.com/w/cpp/language/value_category)：
+虽然我并不赞同`Each expression has some non-reference type`这个说法（参考[Scott Meyers: Expressions can have Reference Type](https://scottmeyers.blogspot.com/2015/02/expressions-can-have-reference-type.html)）。因此我们说的左值右值，其实是在判断表达式的`value category`，而不是`type`。“右值引用是左值”这句话更严谨的表达是“单独由一个右值引用类型组成的表达式的`value category`是一个左值（虽然表达式的类型依然是右值引用）”。这也来源于[Value categories](https://en.cppreference.com/w/cpp/language/value_category)：
 
 > The following expressions are *lvalue expressions*:
 >
-> * the name of a variable, a function, a [template parameter object](https://en.cppreference.com/w/cpp/language/template_parameters#Non-type_template_parameter) (since C++20), or a data member, regardless of type, such as [std::cin](http://en.cppreference.com/w/cpp/io/cin) or [std::endl](http://en.cppreference.com/w/cpp/io/manip/endl). Even if the variable's type is rvalue reference, the expression consisting of its name is an lvalue expression;
+> * the name of a variable, a function, a [template parameter object](https://en.cppreference.com/w/cpp/language/template_parameters#Non-type_template_parameter) (since C++20), or a data member, regardless of type, such as [std::cin](https://en.cppreference.com/w/cpp/io/cin) or [std::endl](https://en.cppreference.com/w/cpp/io/manip/endl). Even if the variable's type is rvalue reference, the expression consisting of its name is an lvalue expression;
 > * a function call or an overloaded operator expression, whose return type is lvalue reference;
 
 因此，为了解释强转为右值引用的合理性，只需要判断`(G&&)m`的`value categories`即可。`(G&&)m`适用于第二条规则。
@@ -246,7 +246,7 @@ int main()
 > 只有模板类才能做偏特化，因为类不能够重载。模板函数只能做全特化
 {: .prompt-info }
 
-另一个迷惑性的例子（来自[Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](http://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)）
+另一个迷惑性的例子（来自[Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](https://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)）
 
 ```cpp
 template<typename T>
@@ -272,7 +272,7 @@ int main() {
 
 ### 3.2. 右值引用与函数重载
 
-下面的例子来源于[Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](http://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)
+下面的例子来源于[Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](https://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)
 
 ```cpp
 template<typename T>
@@ -636,5 +636,5 @@ template<typename _Iterator, typename = __void_t<>>  // __void_t 相当于 void_
 * [An Introduction to "Iterator Traits" - CodeProject](https://www.codeproject.com/Articles/36530/An-Introduction-to-Iterator-Traits)
 * [Writing a custom iterator in modern C++ - Internal Pointers](https://www.internalpointers.com/post/writing-custom-iterators-modern-cpp)
 * [c++ - What is the partial ordering procedure in template deduction - Stack Overflow](https://stackoverflow.com/questions/17005985/what-is-the-partial-ordering-procedure-in-template-deduction)
-* [Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](http://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)
-* [Expressions can have Reference Type](http://scottmeyers.blogspot.com/2015/02/expressions-can-have-reference-type.html)
+* [Multi-paradigm: Rvalue references and function overloading. (yapb-soc.blogspot.com)](https://yapb-soc.blogspot.com/2015/01/rvalue-references-and-function.html)
+* [Expressions can have Reference Type](https://scottmeyers.blogspot.com/2015/02/expressions-can-have-reference-type.html)
