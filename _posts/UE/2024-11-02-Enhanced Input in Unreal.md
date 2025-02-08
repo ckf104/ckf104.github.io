@@ -1,3 +1,11 @@
+---
+title: Enhanced Input in Unreal
+date: 2024-11-02 18:45:05 +0800
+comments: true
+categories:
+  - UE5
+---
+
 ### (Enhanced) input component with actor
 这一节描述 input component 和 actor 之间的交互。每个 actor 都有个 input component，虽然我觉得大部分 actor 都用不上。在有了 enhanced input 后，可以在 project settings 中 input component 的默认类型为 `UInputComponent` 或者 `UEnhancedInputComponent`
 ```c++

@@ -1,42 +1,11 @@
+---
+title: Actor Spawning in Unreal
+categories:
+  - UE5
+comments: true
+date: 2025-01-11 10:22:31 +0800
+---
 
-TODO：解释 `UChildActorComponent` 的用法，以及 actor 中的下面字段
-```c++
-/** The UChildActorComponent that owns this Actor. */
-UPROPERTY()
-TWeakObjectPtr<UChildActorComponent> ParentComponent;	
-```
-TODO：解释 actor 间的父子关系
-```c++
-/** Array of all Actors whose Owner is this actor, these are not necessarily spawned by UChildActorComponent */
-UPROPERTY(Transient)
-TArray<TObjectPtr<AActor>> Children;
-
-/**
- * Owner of this Actor, used primarily for replication (bNetUseOwnerRelevancy & bOnlyRelevantToOwner) and visibility (PrimitiveComponent bOwnerNoSee and bOnlyOwnerSee)
- * @see SetOwner(), GetOwner()
- */
-UPROPERTY(ReplicatedUsing=OnRep_Owner)
-TObjectPtr<AActor> Owner;
-```
-感觉和 primitive component 中的下面字段有些关系的
-```c++
-/** If this is True, this component won't be visible when the view actor is the component's owner, directly or indirectly. */
-UPROPERTY(EditAnywhere, AdvancedDisplay, BlueprintReadOnly, Category = Rendering)
-uint8 bOwnerNoSee:1;
-
-/** If this is True, this component will only be visible when the view actor is the component's owner, directly or indirectly. */
-UPROPERTY(EditAnywhere, AdvancedDisplay, BlueprintReadOnly, Category = Rendering)
-uint8 bOnlyOwnerSee:1;
-```
-TODO： Actor 的 Owned Component 是在哪设置的
-```c++
-/**
- * All ActorComponents owned by this Actor. Stored as a Set as actors may have a large number of components
- * @see GetComponents()
- */
-TSet<TObjectPtr<UActorComponent>> OwnedComponents;
-```
-这与 NewObject 和 CreateDefaultSubObject 有关系吗
 ### Spawn Actor Flow
 UWorld::SpawnActor 的大概流程是
 * 根据用户提供的 actor transform，调用 `EncroachingBlockingGeometry` 函数判断这个位置是否会与其它 actor 发生重叠，如果提供的 `ESpawnActorCollisionHandlingMethod` 为 `DontSpawnIfColliding` 且有位置重叠，那么会 spawn 失败
@@ -61,7 +30,7 @@ UWorld::SpawnActor 的大概流程是
 			* 如果此时已经 begin play 了，那么调用 actor 的 `DispatchBeginPlay` 函数。这个函数主要是为 actor 自己和 component 注册 tick function，以及调用自己和 component 的 begin play 函数
 * 最后是调用 uworld 的 `OnActorSpawned` 这个多播
 
-接下来我们对这个流程中某些模块做更详细的说明
+关于这个 flow，[UObjcet & UClass基础（七）— SpawnActor](https://zhuanlan.zhihu.com/p/681062457) 的流程图总结的蛮好的。接下来我们对这个流程中某些模块做更详细的说明
 ### SCS Execution
 这一节我们展开说明 SCS 的执行
 
@@ -100,10 +69,18 @@ uint8 bIsActive:1;
 
 因此如果需要 tick component，要么在构造函数中额外将 `bAutoActivate` 设置为 true，或者将 `PrimaryComponentTick.bStartWithTickEnabled` 设置为 false，后面需要 tick 时再调用 `Activate` 激活 component
 
-但 actor 并没有这样的不一致性，因为它没有在外面包一层冗余的 activate 字段
+但 actor 并没有这样的不一致性，因为它没有在外面包一层冗余的 activate 字段。不过 actor 有一个额外的 `bAllowTickBeforeBeginPlay`，允许在游戏开始之前就注册 tick function
 ```c++
 UPROPERTY(EditDefaultsOnly, Category=Tick)
 struct FActorTickFunction PrimaryActorTick;
+
+/**
+* Whether we allow this Actor to tick before it receives the BeginPlay event.
+* Normally we don't tick actors until after BeginPlay; this setting allows this behavior to be overridden.
+* This Actor must be able to tick for this setting to be relevant.
+*/
+UPROPERTY(EditDefaultsOnly, Category=Tick)
+uint8 bAllowTickBeforeBeginPlay:1;
 ```
 ### SetupAttachment vs AttachToComponent
 一般的说法是 `SetupAttachment` 用于在构造函数中使用，而 `AttachToComponent` 用来 attach 动态创建的 component。不过实际上查看 `AttachToComponent` 源码会发现，它在开始时会检查调用位置是否位于构造函数中，如果是的话，就退化为 `SetupAttachment`
@@ -126,7 +103,36 @@ enum class EComponentCreationMethod : uint8
 };
 ```
 使用 C++ 代码创建的 component 默认为 `Native`（在构造函数中创建或者使用 `NewObject` 动态创建），`SimpleConstructionScript` 对应的是蓝图编辑器中添加的 component，而 `Instance` 是在 level editor 中编辑实例添加的 component，而 `UserConstructionScript` 就是蓝图中使用 `AddComponent` 等函数动态创建的 component
+### Child Actor Component
+TODO：解释 `UChildActorComponent` 的用法，以及 actor 中的下面字段
+```c++
+/** The UChildActorComponent that owns this Actor. */
+UPROPERTY()
+TWeakObjectPtr<UChildActorComponent> ParentComponent;	
+```
+TODO：解释 actor 间的父子关系
+```c++
+/** Array of all Actors whose Owner is this actor, these are not necessarily spawned by UChildActorComponent */
+UPROPERTY(Transient)
+TArray<TObjectPtr<AActor>> Children;
 
+/**
+ * Owner of this Actor, used primarily for replication (bNetUseOwnerRelevancy & bOnlyRelevantToOwner) and visibility (PrimitiveComponent bOwnerNoSee and bOnlyOwnerSee)
+ * @see SetOwner(), GetOwner()
+ */
+UPROPERTY(ReplicatedUsing=OnRep_Owner)
+TObjectPtr<AActor> Owner;
+```
+感觉和 primitive component 中的下面字段有些关系的
+```c++
+/** If this is True, this component won't be visible when the view actor is the component's owner, directly or indirectly. */
+UPROPERTY(EditAnywhere, AdvancedDisplay, BlueprintReadOnly, Category = Rendering)
+uint8 bOwnerNoSee:1;
+
+/** If this is True, this component will only be visible when the view actor is the component's owner, directly or indirectly. */
+UPROPERTY(EditAnywhere, AdvancedDisplay, BlueprintReadOnly, Category = Rendering)
+uint8 bOnlyOwnerSee:1;
+```
 
 
 construct object from class，试了一下，actor 和 component 都不行，但是 user widget 成功了

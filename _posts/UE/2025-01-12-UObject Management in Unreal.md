@@ -1,3 +1,11 @@
+---
+title: UObject Management in Unreal
+comments: true
+date: 2025-01-12 13:27:23 +0800
+categories:
+  - UE5
+---
+
 ### Object Path
 每个 uobject 路径名唯一，路径由 uobject 自身的名字与它的 outer 链组装而成，见 `UObjectBaseUtility::GetPathName`
 通常 `/Game` 表示 project 的 content 目录，`/Engine` 表示 engine 的 content 目录，`/Script` 则表示模块目录，例如 `/Script/MyModuleName` 之类的，而插件的路径名就是将 `Game` 替换为插件的名字
@@ -11,8 +19,7 @@
 template< class T > 
 inline T* FindObject( UObject* Outer, const TCHAR* Name, bool ExactClass=false );
 ```
-`ConstructorHelpers::FObjectFinder` 中会在路径后自动加上 .ObjectName（如果自己没加的话），并且会把 load 上来的 uobject 给加到 gc root 里，虽然我感觉有点多余，因为通常已经有 `RF_StandAlone` 了？但 `RF_StandAlone` 应该不能保证它引用的对象不被回收？
-对比之下 `ConstructorHelpers::FClassFinder` 则是会在路径后加上 .ObjectName_C（如果自己没加的话），其它部分和 object finder 是一样的
+`ConstructorHelpers::FObjectFinder` 中会在路径后自动加上 .ObjectName（如果自己没加的话），并且会把 load 上来的 uobject 给加到 gc root 里，对比之下 `ConstructorHelpers::FClassFinder` 则是会在路径后加上 .ObjectName_C（如果自己没加的话），其它部分和 object finder 是一样的
 ### GUObjectArray
 UE 通过一个全局的，以 chunk 形式组织的 `UObjectItem` 数组来管理 uobject
 ```c++
