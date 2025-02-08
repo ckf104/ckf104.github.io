@@ -94,7 +94,7 @@ legacy default stream 模式是每个 process 都有一个 NULL stream。[Stream
 
 ### Error Handling
 
-[Asynchronous Error Handling Is Hard](http://www.cudahandbook.com/2023/11/asynchronous-error-handling-is-hard/) 中谈到了三种错误处理的范式：exception，Immediate error return，global error variable。cuda 中使用了后两种错误处理的方式。除了每个 cuda 函数都会返回是否 error 外，[Error Checking](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#error-checking) 文档中讲到每个 host thread 都有一个线程局部的 error variable，每次错误发生时都会设置它。可以通过 cudaPeekAtLastError 或者 cudaGetLastError 来获取这个它。仅使用 Immediate error return 是不够的，因为 cuda 中有许多异步函数，用户不知道这些异步函数是否执行成功了。这也是为什么 cuda 文档中对许多函数的描述都会有下面的一句话
+[Asynchronous Error Handling Is Hard](https://www.cudahandbook.com/2023/11/asynchronous-error-handling-is-hard/) 中谈到了三种错误处理的范式：exception，Immediate error return，global error variable。cuda 中使用了后两种错误处理的方式。除了每个 cuda 函数都会返回是否 error 外，[Error Checking](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#error-checking) 文档中讲到每个 host thread 都有一个线程局部的 error variable，每次错误发生时都会设置它。可以通过 cudaPeekAtLastError 或者 cudaGetLastError 来获取这个它。仅使用 Immediate error return 是不够的，因为 cuda 中有许多异步函数，用户不知道这些异步函数是否执行成功了。这也是为什么 cuda 文档中对许多函数的描述都会有下面的一句话
 
 > Note that this function may also return error codes from previous, asynchronous launches.
 
