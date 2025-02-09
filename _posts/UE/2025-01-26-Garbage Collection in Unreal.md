@@ -259,6 +259,14 @@ struct alignas(PLATFORM_CACHE_LINE_SIZE) FWorkerContext
 
 另外就是 `ClearWeakReferences` 函数也需要修改。因为上一次未完成的 RA 添加的 weak reference 可能已经失效了。所以当最终完成的 RA 的 iteration 次数大于 1 时（即该 RA 分成多次完成），需要利用 `FWeakReferenceEliminator`，重新调用所有需要添加的 weak ref 的 objects 的 ARO 函数来置空它们的指向 unreachable objects 的 weak ref（但是在遍历引用，重启 pending RA 时我们不会重新调用 objects 的 ARO 来收集可能的新修改的引用，因为这个开销太大了）
 ### GC Debugging
+一个通常的需求是，给一个 object，我希望弄清楚它的引用关系，它引用了谁，谁又引用了它。Rama 在帖子 [Count References to Any Object, and Know Who is Referring!](https://forums.unrealengine.com/t/new-wiki-memory-management-count-references-to-any-object-and-know-who-is-referring/59401) 中发布了一个新的 wiki，这个 wiki 使用 UE 提供的 `FReferenceFinder` 来找出一个 object 直接或间接地引用了哪些 object。对应的 wiki 页面是 [Garbage Collection ~ Count References To Any Object](https://unrealcommunity.wiki/garbage-collection-~-count-references-to-any-object-2afrgp8l)
+
+但我认为搞清楚谁引用了给定的 object 是常见的需求，[Count References to Any Object, and Know Who is Referring!](https://forums.unrealengine.com/t/new-wiki-memory-management-count-references-to-any-object-and-know-who-is-referring/59401) 中的一个评论谈到可以使用 `IsReferenced` 这个函数来找出所有引用这个 object 的 objects。但我翻了一下这个函数的实现，它内部做 RA 时，会将所有不可达的 objects 都标记为 unreachable，这会扰乱正常的 GC flow（它要求 GC 开始时所有的 objects 都有且仅有 reachable 标记，见 GC 开始时调用的 `VerifyObjectFlags` 函数）。在源码中搜索了一下，发现只有 editor 会调用这个函数，而在 PIE 之前 tick 都不会触发垃圾回收，我猜 editor 内部可能会在调用 `IsReferenced` 后自己再做一个 garbage purge，来清理掉所有的 unreachable flag 之类的吧
+
+找了一圈，发现 `FReferencerFinder::GetAllReferencers` 是一个不错的选择，和 GC 类似，它会使用 collector 和 processor 来多线程地遍历 `GUObjectArray`：
+* 它把 `GUObjectArray` 中几乎所有的 objects 都加入到了 initial objects 中，这样就不需要像 GC 那样递归地搜索了
+* 它使用默认的 `TDefaultCollector` 和 `TDirectDispatcher`，但 processor 使用自定义的 `FAllReferencesProcessor`，这个 processor 的 `HandleTokenStreamObjectReference` 实现也很自然，就是判断 dispatcher 传过来的引用关系是不是引用我们关注的 objects，如果是，那么就把这个引用关系保存起来即可。最后把所有保存的引用关系返回给用户即可
+
 TODO：解释与 GC debug 有关的 console variable
 gc.ForceEnableGCProcessor
 gc.GarbageReferenceTrackingEnabled
