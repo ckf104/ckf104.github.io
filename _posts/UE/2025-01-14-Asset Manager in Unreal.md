@@ -1,18 +1,28 @@
-TODO: 在 [中文直播 第33期 | UE4资产管理基础1 | Epic 大钊](https://www.bilibili.com/video/BV1Mr4y1A7nZ/?vd_source=2f38c661a6672237a3f59835e4bfb1a5) 中讲到 load 上来的资产在没有被引用时会正常被垃圾回收，但在 editor 模式下却会被 cache，这个需要验证一下，我尤其关心如何将 load 上来的 package 又卸载掉（因为前面讲到 load 上来的资产有 `RF_StandAlone` 标记，不知道是不是只有编辑器模式下才会这样）
+---
+title: Asset Manager in Unreal
+categories:
+  - UE5
+date: 2025-01-14 21:44:51 +0800
+comments: true
+---
 
-TOOD：看看官方文档的 [Asynchronous Asset Loading](https://dev.epicgames.com/documentation/en-us/unreal-engine/asynchronous-asset-loading-in-unreal-engine)
 ### Package Loading / Unloading
 `LoadPackage`，`LoadObject` 以及 `FStreamableManager` 相关的 loading 函数，它们底下都是调用全局的 async package loader 提供的 load package async 接口
 
 试着调用了一下 `UPackageTools::UnloadPackages`，观察到的现象是
 * 如果此时没有指针指向这个 package 中的对象，那么这个 package 就能被 unload
 * 如果有指针指向这个 package 中的对象（或者是任何子对象），这个 package 就仍然在内存中
-TODO：看看 `UPackageTools::UnloadPackages` 的代码，看看它是怎么判断有没有指针指向 package 中的对象的
-TODO：`UPackageTools::UnloadPackages` 看起来只在存在 GEditor 的时候有效，没有 Editor 的时候这个 load 上来的 package 是怎样的状态？以及 `UPackageTools::UnloadPackages` 中也调用了 `UnloadPrimaryAsset`，这与 `UAssetManager::PreGarbageCollect` 有什么关系吗？
-TODO：`FStreamableManager` 是怎么 unload 的？用 `FStreamableManager` 进行 load 和 unload 效果和用 `LoadPackage` 一样吗？
 
-1. 先看看 unload package 函数是怎么把 RF_StandAlone 干掉的
-2. 看看 RF_StandAlone 哪来的，是不是只有在编辑器模式下才有
+查看 `UPackageTools::UnloadPackages` 的源码，它其实就是调用 `CollectGarbage` 来手动触发 GC。大概的流程如下
+* 首先将需要 unload 的 package 加入到 gc root 中，避免 package 和它的 `MetaData` 被回收
+* 由于编辑器模式下带有 `RF_StandAlone` 标记的 uobject 会被视为 root object，因此把需要卸载的 package 包含的 objects（所有在该 package 中的 objects，不仅仅是 outer 为该 package 的 objects）的 `RF_StandAlone` 标记都 clear 掉
+* 调用 `CollectGarbage` 触发垃圾回收
+* 如果有该 package 中的 object 没有被回收，并且它的 `RF_StandAlone` 标记在之前被 clear 掉了，那么重新 set 它的 `RF_StandAlone` 标记
+* 将 package 从 gc root 中移除，清除掉 package 的 `MetaData` 的 `RF_StandAlone` 标记，再次调用 `CollectGarbage` 触发垃圾回收
+
+TODO：看看 `RF_StandAlone` 哪来的，是不是只有在编辑器模式下才有
+TODO：解释为什么要调用两次 `CollectGarbage` 来分批回收
+TODO：看看官方文档 [Asset Metadata](https://dev.epicgames.com/documentation/en-us/unreal-engine/asset-metadata-in-unreal-engine?application_version=5.4)，这玩意好像只是在编辑器模式下有用
 ### Asset Registry
 asset registry 是 asset manager 以及 content browser 依赖的更底层的资产管理模块。它会扫描目录中的 uasset 文件，每个 uasset 文件通过一个 `FAssetData` 结构来描述
 ```c++
@@ -28,15 +38,21 @@ struct FAssetData
 	FTopLevelAssetPath AssetClassPath;
 	/** The map of values for properties that were marked AssetRegistrySearchable or added by GetAssetRegistryTags */
 	FAssetDataTagMapSharedView TagsAndValues;
-
+	/**
+	 * The 'AssetBundles' tag key is separated from TagsAndValues and typed for performance reasons.
+	 * This is likely a temporary solution that will be generalized in some other fashion. 	
+	 */
+	TSharedPtr<FAssetBundleData, ESPMode::ThreadSafe> TaggedAssetBundles;
 	// 其它字段.....
 };
 ```
-这个 asset 文件对应的 uobject 可能并没有加载到内存中。如果需要获取对应的 uobject，调用 asset data 的 `GetAsset` 函数即可，该函数内部会调用 `LoadPackage` 同步地加载 package，然后返回对应的 uobject
+展示的 `FAssetData` 的前三个字段用来描述 asset 的路径，第四个字段描述 asset 的 object 类型，后两个字段是与该 asset 相关的，用户可自定义的额外信息，`TagsAndValues` 和 `TaggedAssetBundles` 将分别在 Customize Asset Details 和 Asset Bundle 小节进行描述
+
+asset data 对应的 uobject 可能并没有加载到内存中。如果需要获取对应的 uobject，调用 asset data 的 `GetAsset` 函数即可，该函数内部会调用 `LoadPackage` 同步地加载 package，然后返回对应的 uobject
 
 而 asset path 到 asset data 的映射维护在 `FAssetRegistryState` 中，一些更详细的讨论以及对其它字段的描述可以参考 [UE4 AssetRegistry分析](https://zhuanlan.zhihu.com/p/76964514)
 #### Customize Asset Details
-其中 `TagsAndValues` 字段以 key, value 的形式记录了 asset 的额外信息，也就是当我们将鼠标放置于编辑器的 asset 图标上时显示的信息。用户可以重载 uobject 的 `GetAssetRegistryTags` 函数来定义自己的 key，value pair
+`TagsAndValues` 字段以 key, value 的形式记录了 asset 的额外信息，也就是当我们将鼠标放置于编辑器的 asset 图标上时显示的信息。用户可以重载 uobject 的 `GetAssetRegistryTags` 函数来定义自己的 key，value pair
 ```c++
 /**
 * Gathers a list of asset registry searchable tags which are name/value pairs with some type information
@@ -195,7 +211,7 @@ struct FStreamable
 
 最后说一下 streamable manager 中与垃圾回收相关的部分。在 handle 析构，或者手动调用 handle 的 `CancelHandle` 或 `ReleaseHandle` 时，它会找到所有与自己关联的 `FStreamable`，然后将自己从 `FStreamable` 的 `ActiveHandles` 中移除。streamable manager 继承自 `FGCObject`，重载了它的 `AddReferencedObjects` 方法，来保证 `FStreamable` 引用的 `Target` 都不会被 GC 移除。同时 streamable manager 在自己的构造函数中，注册了一个 pre garbage collect 回调 `OnPreGarbageCollect`，这个回调函数在垃圾回收开始执行之前调用，它会将所有 `ActiveHandles` 为空的 `FStreamable` 从 `StreamableItems` 这个 map 中移除
 
-**TODO：How to unload package loaded by streamable manager？ 单单调用 `FStreamableManager::Unload` 是否足够？在编辑器模式与 game 模式下是否有区别？**
+如果与 asset 相关联的 handle 都被 release 掉了，那 streamable manager 将不再持有这个 asset 的引用，如果此时 asset 也没有其它的引用了，且在非编辑器模式下，这个 asset 就会被垃圾回收掉。但在编辑器模式下，由于 asset 对应的 object 持有 `RF_StandAlone` 标记，因此它将仍然保留在内存中，除非手动调用 `UPackageTools::UnloadPackages`
 #### Primary Asset Loading
 streamable manager 是通过 asset path 来对 asset 进行加载。而更上层的 asset manager 提供了 `LoadPrimaryAsset` 函数，根据 primary asset id 来加载 asset。同样的，可以指定一个回调函数，在加载完成时调用。返回 `TSharedPtr<FStreamableHandle>`
 ```c++
@@ -221,12 +237,14 @@ streamable manager 是通过 asset path 来对 asset 进行加载。而更上层
 	/** Backpointer to handles that depend on this */
 	TArray<TWeakPtr<FStreamableHandle> > ParentHandles;
 ```
-现在我们可以回头看下这个 `FPrimaryAssetData` 中的 `CurrentState` 和 `PendingState` 了，它保存了目前负责加载这个 asset 的 handle
+现在我们可以回头看下这个 `FPrimaryAssetData` 中的 `CurrentState` 和 `PendingState` 了，它保存了目前负责加载这个 asset 的 handle。额外的 `BundleName` 字段在 Asset Bundle 一节会进行解释
 ```c++
 struct FPrimaryAssetLoadState
 {
 	/** The handle to the streamable state for this asset, this keeps the objects in memory. If handle is invalid, not in memory at all */
 	TSharedPtr<FStreamableHandle> Handle;
+	/** The set of bundles to be loaded by the handle */
+	TArray<FName> BundleNames;
 };
 ```
 如果 asset 此前已经通过 `LoadPrimaryAsset` 函数加载进来了，那么 `LoadPrimaryAsset` 会检测到这个 asset 的 `FPrimaryAssetData` 的 current state 已经被设置为一个合法的 handle 了，就会跳过加载。如果所有的 asset 都是这样，该函数就会返回一个空的 handle
@@ -248,16 +266,62 @@ struct FPrimaryAssetLoadState
 
 与 `LoadPrimaryAsset` 相对应的是 `UnloadPrimaryAsset` 函数，它会把 primary asset id 对应的 `FPrimaryAssetData` 持有的 handle 清空，并
 调用 handle 的 `CancelHandle` 函数将该 handle 从 streamable manager 中移除（此时该 handle 就没用了，即使用户手里还持有它的引用，让它没有析构）
+#### Asset Bundle
+在 `ObjectMacros.h` 中定义了 UE 中所有的拓展宏，其中 `AssetBundles` 是用于 uproperty 的 metadata。从注释可以看到，用 `AssetBundles` 修饰的字段应位于 primary data asset 中并且类型是 `SoftObjectPtr` 或 `SoftObjectPath`
+```C++
+		/// [PropertyMetadata] Used for SoftObjectPtr/SoftObjectPath properties. Comma separated list of Bundle names used inside PrimaryDataAssets to specify which bundles this reference is part of
+		AssetBundles,
+```
+它用于指示字段属于哪些 bundle。通常情况下，`SoftObjectPath` 和 `SoftObjectPtr` 作为一种软链接，在 primary data asset 加载到内存中时，它们指向的 asset 不会被加载。但 asset manager 的 `LoadPrimaryAssets` 函数接受一个 `LoadBundles` 参数，指示属于哪些 bundle 的 asset 需要也加载进来。此时这个 primary data asset 对应的 streamable handle 的 `RequestedAssets` 字段包括的 asset 除了 primary data asset 外，还包括需要加载的 bundle 中含义的 asset
 
-**TODO：解释 asset bundle 这个概念**
-**TODO：解释 chunk 这个概念**
+查看保存的 uasset 文件可以发现，`AssetBundles` metadata 信息会序列化到磁盘。由此我们可以拿到每个 primary data asset 的 bundle 组成。在内存中这些信息保存在 `FAssetData` 的 `TaggedAssetBundles` 字段中
+```c++
+	/**
+	 * The 'AssetBundles' tag key is separated from TagsAndValues and typed for performance reasons.
+	 * This is likely a temporary solution that will be generalized in some other fashion. 	
+	 */
+	TSharedPtr<FAssetBundleData, ESPMode::ThreadSafe> TaggedAssetBundles;
+```
+也会 cache 在 asset manager 的 `CachedAssetBundles` 字段
+```c++
+	/** Cached map of asset bundles, global and per primary asset */
+	TMap<FPrimaryAssetId, TSharedPtr<FAssetBundleData, ESPMode::ThreadSafe>> CachedAssetBundles;
+```
+`FAssetBundleData` 结构体包含了一个 primary data asset 的全部 bundle 信息
+```c++
+struct FAssetBundleEntry
+{
+	/** Specific name of this bundle, should be unique for a given scope */
+	FName BundleName;
+	/** List of references to top-level assets contained in this bundle */
+	TArray<FTopLevelAssetPath> AssetPaths;
+};
+
+struct FAssetBundleData
+{
+	/** List of bundles defined */
+	TArray<FAssetBundleEntry> Bundles;
+};
+```
+由于一个 `SoftObjectPath` 或 `SoftObjectPtr` 可以设置为属于多个 bundle，因此 `FAssetBundleData` 中可能包含重复的 asset 路径
+
+最后是 `FPrimaryAssetLoadState` 也包含 `BundleNames` 字段，用来指示这个 primary data assset 的哪些 bundle 被加载上来了
+```c++
+	/** The set of bundles to be loaded by the handle */
+	TArray<FName> BundleNames;
+```
+或者称为当前的 bundle state 更为恰当，例如我们设置了名为 game 和名为 menu 的两个 bundle，一开始用 asset manager 的 `LoadPrimaryAssets` 加载了 game bundle，如果第二次调用 `LoadPrimaryAssets` 时选择加载 menu bundle，那么 game bundle 对应的资产在没有用户的引用时被垃圾回收掉。一个示例见 [UE的runtime资产管理（1）- 基于AssetManager的资源加载与释放的实现](https://zhuanlan.zhihu.com/p/17972602309)。其中还提到了实时更新 handle 的 asset 加载进度的方法，这也挺有意思的
+
+TODO：解释 asset manager settings 中的选项，例如 rules 等，
+TODO：官方文档 [Asset Management](https://dev.epicgames.com/documentation/en-us/unreal-engine/asset-management-in-unreal-engine?application_version=5.4) 还讨论了 Blueprint Primary Asset，和 C++ 有什么区别吗
+**TODO：解释 chunk 这个概念**，看看官方文档 [Cooking and Chunking](https://dev.epicgames.com/documentation/en-us/unreal-engine/cooking-content-and-creating-chunks-in-unreal-engine?application_version=5.4)
+TODO：解释 `UPrimaryAssetLabel` 类的作用，[虚幻引擎资产管理总结](https://zhuanlan.zhihu.com/p/503069332) 中提到它和资产的 chunk 分块有关系
+TODO：重新看看 [Asset Manager 阐述](https://www.bilibili.com/video/BV1ag41177C1/?spm_id_from=333.788.videopod.sections&vd_source=2f38c661a6672237a3f59835e4bfb1a5)，它除了提到 asset bundle，chunking，还有 asset manager 涉及到 cooking 和 packaging 的一些东西
+TODO：[加载资源的方式（七）使用AssetManager进行加载](https://www.cnblogs.com/sin998/p/15553121.html) 这个系列可以再看看，其中提到了 `UObjectLibrary` 也与资源加载有关，不知道现在还用不用这个了，官方文档 [Asynchronous Asset Loading](https://dev.epicgames.com/documentation/en-us/unreal-engine/asynchronous-asset-loading-in-unreal-engine) 也提到了这个
 ### Custom Asset
 继承 `UFactory`，一些简单的例子可以参考 `UDataAssetFactory`，`UDataTableFactory`，这本质上是定义了 asset 在内存中的 uobject 类型
 
-
-
-
-
 TODO：整理下面这个
-[# UObject Constructor, PostInitProperties and PostLoad](https://heapcleaner.wordpress.com/2016/06/11/uobject-constructor-postinitproperties-and-postload/) 写得挺好的。自定义 `UMyDataAsset` 继承自 `UDataAsset`，在编辑器创建这个资产并进行编辑时，在 `LoadPackage` 函数中，创建了一个新的 `UMyDataAsset` 对象，并调用了它的 `PostLoad` 方法，它的路径是 `/Game/ThirdPerson/NewDataAsset.NewDataAsset`，因此我们在编辑器中编辑的是这个对象，而非 CDO。另外就是，这个对象有 `RF_StandAlone` 标记，不会被 GC 回收
-TODO：需要测试标记 `RF_StandAlone` 这玩意是不是仅在编辑器模式下才有的 
+[# UObject Constructor, PostInitProperties and PostLoad](https://heapcleaner.wordpress.com/2016/06/11/uobject-constructor-postinitproperties-and-postload/) 写得挺好的。自定义 `UMyDataAsset` 继承自 `UDataAsset`，在编辑器创建这个资产并进行编辑时，在 `LoadPackage` 函数中，创建了一个新的 `UMyDataAsset` 对象，并调用了它的 `PostLoad` 方法，它的路径是 `/Game/ThirdPerson/NewDataAsset.NewDataAsset`，因此我们在编辑器中编辑的是这个对象，而非 CDO。另外就是，这个对象有 `RF_StandAlone` 标记，不会被 GC 回收。另外，解释 NeedLoad NeedPostLoad NeedPostLoadSubObjects 等相关的 flag
+
+TODO：清理 asset manager 相关的标签页
