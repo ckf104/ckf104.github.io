@@ -1,4 +1,12 @@
+### Overview
+创建蓝图资产时，需要继承 `UUserWidget` 或者它的子类（可以是 C++ 类也可以是蓝图类，这和创建通常的蓝图资产是一样的）。资产对应的 object 类型是 `UWidgetBlueprint`，它自然是 `UBlueprint` 的子类，然后它的 generated class 是 `UWidgetBlueprintGeneratedClass`，这也是 `UBlueprintGeneratedClass` 的子类
+
+创建完成后，我们在 UMG 编辑器中添加需要的 UI 控件，可以在右上角中勾选或者取消 `Is Variable` 这个选项来控制这个 UI 控件是否要作为蓝图变量。作为蓝图变量的 UI 控件就可以在蓝图中正常使用逻辑去控制（这对应 C++ 中 `UWidget` 的 `bIsVariable` 字段）
+#### Color Inheritance
+有许多 UI 控件，例如 button 和 user widget，会有 foreground color 之类的字段，它不是用来指示自身的颜色的，而是用来设置子控件的颜色的，如果子控件的颜色字段勾选了 `Inherit`，就会使用祖先控件的 foreground color，而不是该字段的颜色值
 ### Slate Brush
+这个结构体来指定一个 UI 元素的外观。例如 button 就包含 normal，pressed，hovered，disabled 四个 slate brush 来指定各种状态下 button 的外观
+
 TODO：解释 slate brush中各个字段的含义，以及它如何控制渲染效果
 ### UPanelWidget and UPanelSlot
 `UPanelWidget` 的子类才有子节点，有 1 个还是多个子节点取决于 `bCanHaveMultipleChildren` 字段的值，在 `UPanelWidget` 的构造函数中默认为 true
@@ -59,8 +67,39 @@ TODO：了解 property binding/function binding 的实现，如何声明哪些�
 TODO：meta bindwidget bindwidget optional
 bindwidgetanim transient
 ### Widget Animation
-TODO：试试 UI 动画
+[Ryan Laley, Widgets Part 4: Animations](https://www.youtube.com/watch?v=LMZoRSqoJ74) 讲得挺好的
 
+### Input and Focus Managements
+`UWidget` 的 `Visibility` 字段控制该 widget 是否能够显示与交互
+```c++
+/** Is an entity visible? */
+UENUM(BlueprintType)
+enum class ESlateVisibility : uint8
+{
+	/** Visible and hit-testable (can interact with cursor). Default value. */
+	Visible,
+	/** Not visible and takes up no space in the layout (obviously not hit-testable). */
+	Collapsed,
+	/** Not visible but occupies layout space (obviously not hit-testable). */
+	Hidden,
+	/** Visible but not hit-testable (cannot interact with cursor) and children in the hierarchy (if any) are also not hit-testable. */
+	HitTestInvisible UMETA(DisplayName = "Not Hit-Testable (Self & All Children)"),
+	/** Visible but not hit-testable (cannot interact with cursor) and doesn't affect hit-testing on children (if any). */
+	SelfHitTestInvisible UMETA(DisplayName = "Not Hit-Testable (Self Only)")
+};
+
+class UWidget : public UVisual, public INotifyFieldValueChanged
+{
+	/** The visibility of the widget */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, FieldNotify, Getter, Setter, BlueprintGetter="GetVisibility", BlueprintSetter="SetVisibility", Category="Behavior")
+	ESlateVisibility Visibility;
+};
+```
+如果不是 visible 的，那么就在界面上不可见。`Hidden` 和 `Collapsed` 的区别在于这个 widget 不可见的时候还要不要占位置。例如一个 widget 在一个 vertical widget 中，如果该 widget 设置为 `Hidden`，那么即使该 widget 不可见，还是会占着 vertical widget 中的一个位置。视觉上就是该 vertical widget 中间某一项被跳过去了，没有显示出来。而 hit-testable 主要说这个 widget 能不能交互，例如一个 button，即使设置了鼠标点击事件的回调函数，如果 button 被设置为了 `SelfHitTestInvisible`，那么这个回调函数也不会被调用
+
+[Ryan Laley, Widgets Part 5: Controller Support](https://www.youtube.com/watch?v=kPVqewOgmNo) 是一个很好的管理 user focus 的例子。关于 user focus 和 input routing 的底层实现，见 Slate in Unreal
+
+TODO：`FCharacterEvent` 和 `FKeyEvent` 有什么区别
 ### Initialization Timing
 user widget 中定义的下列初始化函数的调用时机是怎样的，和蓝图中的 PreConstruct，Construct，Event On OnInitialized 等的关系是什么
 ```c++
@@ -70,6 +109,9 @@ UMG_API virtual void NativeConstruct();
 UMG_API virtual void NativeDestruct();
 UMG_API virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime);
 ```
+`NativePreConstruct` 会调用 `PreConstruct` 这个在蓝图中可实现的函数，`NativeConstruct` 会调用 `Construct` 这个在蓝图中可以实现的函数，其它是类似的
+
+根据 [Widget construct vs preconstruct vs initiliazed events](https://forums.unrealengine.com/t/widget-construct-vs-preconstruct-vs-initiliazed-events/475397)，`PreConstruct` 可以理解为构造函数，并且它设置的值是在编辑器中可见的（覆盖编辑器中原有的设置），而 `Construct` 类似于 `BeginPlay` 回调，在游戏开始时调用。不过没看明白它说的这个 `OnInitialized` 的调用时机
 ### TODO: Owner 的影响，UserWidget 的 Owner 设置为 PlayerController 时会在切换关卡时挂掉，Owner 设置为 GameInstance 是不是就好了
 ### Anchor
 因为我们通常设计 UI 时，总需要一个参考的屏幕的屏幕分辨率来将其可视化。anchor 这个概念要解决的问题是当屏幕分辨率变化时，如何确定新的 UI 布局。首先我们定义什么是 UI 布局：我们使用一个矩形来标定 UI 元素的位置。给定长宽的画布，我们清楚了每个 UI 矩形在画布中的位置和大小，那么就清楚了 UI 布局
@@ -107,3 +149,9 @@ TODO：解释这个布局，通过 slot，我们有子节点的 desired size，�
 TODO：解释它与 rendering 子系统如何交互
 ### Input
 TODO：解释它如何接收 input，以及如何与 enhanced input 系统协作
+
+
+
+
+### ActionRPG UI Notes
+button 的 normal, hovered 等四个 `FSlateBrush` 的 `DrawAs` 设置为 None，来实现一个透明的 button
