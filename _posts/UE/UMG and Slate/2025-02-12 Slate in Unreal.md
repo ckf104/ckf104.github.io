@@ -1,6 +1,43 @@
 slate 的官方文档：[Slate UI Framework](https://dev.epicgames.com/documentation/en-us/unreal-engine/slate-user-interface-programming-framework-for-unreal-engine)
 
 [UE4 Slate基础](https://zhuanlan.zhihu.com/p/692551733) 也讲得不错，但是它主要关心的是渲染
+### Slate Construction
+`SWidget` 采取了 builder pattern 来组织自己的构造函数，并且 builder 的类型名统一为 `SMyWidget::FArguments`。通常会使用 `SLATE_BEGIN_ARGS` 来声明 builder，然后利用 `SLATE_XXX` 宏来定义 builder 的成员变量。最后是 `SLATE_END_ARGS` 宏结束 builder 的定义。这之后就是定义 widget 自身的成员变量了，builder 的成员变量一般是用来给 widget 中的成员变量赋值的，但它们并不需要一一对应
+```c++
+class SMyWidget: public SParentWidget
+{
+	SLATE_BEGIN_ARGS( SMyWidget )
+	// 构造函数
+	// 各种成员定义，例如
+	SLATE_ATTRIBUTE( FText, Text )  // 定义可以使用函数动态绑定的参数
+	SLATE_ARGUMENT( EVerticalAlignment, VAlign ) // 定义不变的参数
+	SLATE_EVENT( FSimpleDelegate, OnPressed )  // 定义 delgate 回调
+	SLATE_DEFAULT_SLOT( FArguments, Content )  // 定义 content swidget
+	
+	SLATE_END_ARGS()
+
+	// 定义 SMyWidget 的成员
+	TSlateAttribute<FText> BoundText;
+	FSimpleDelegate OnPressed;
+};
+```
+builder 的声明中最常见的有下面这些 `SLATE_XXX` 宏
+* `SLATE_ARGUMENT`，声明一个普通的成员变量，通常用来给一个 swidget 中普通的成员变量赋值
+* `SLATE_ATTRIBUTE`，声明一个可以绑定回调函数的成员变量，通常用来给 swidget 中 `TSlateAttribute` 模板类型的成员变量赋值，如果绑定了代理，那么 slate 每次会调用绑定的代理来获取成员变量的值
+* `SLATE_EVENT`，声明一个代理，便于用户绑定事件回调，这里代理通常会赋值给 swidget 中的某个代理类型的成员变量
+* `SLATE_DEFAULT_SLOT`，声明一个 swidget 成员变量引用，在 `SCompoundWidget` 的子类中很常见，它用来指示 `SCompoundWidget` 唯一包含的子 swidget（`ChildSlot` 字段）
+
+每个 swidget 需要有自己的 `Construct` 方法，定义如何通过 `FArguments` 来初始化自己的各个成员
+```c++
+	UMG_API void Construct(const FArguments& InArgs, UUserWidget* InWidgetObject);
+```
+这里有点傻逼的是，虽然 swidget 之间有继承关系，但是 swidget 的 `FArguments` 之间是没有继承关系的，这意味着子类的 `FArguments` 不仅要定义子类的成员变量初始化需要的信息，还需要定义所有父类需要的信息。例如父类的 `FArguments` 定义了 `SLATE_DEFAULT_SLOT`，子类的 `FArguments` 还是需要定义 `SLATE_DEFAULT_SLOT`
+
+
+
+解释 swidget 的 build 语法，以及 + 号，中括号
+
+TODO：解释 `SLATE_ATTRIBUTE` 和 UMG 中 property binding 的关系
 ### Input Routing
 这一节我们讨论 slate 是如何处理用户输入的，我们希望捋清楚输入什么时候会发送到 UI，什么时候又会发送到 game logic
 #### Basic Concepts

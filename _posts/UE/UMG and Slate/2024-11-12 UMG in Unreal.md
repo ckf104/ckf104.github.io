@@ -100,18 +100,6 @@ class UWidget : public UVisual, public INotifyFieldValueChanged
 [Ryan Laley, Widgets Part 5: Controller Support](https://www.youtube.com/watch?v=kPVqewOgmNo) 是一个很好的管理 user focus 的例子。关于 user focus 和 input routing 的底层实现，见 Slate in Unreal
 
 TODO：`FCharacterEvent` 和 `FKeyEvent` 有什么区别
-### Initialization Timing
-user widget 中定义的下列初始化函数的调用时机是怎样的，和蓝图中的 PreConstruct，Construct，Event On OnInitialized 等的关系是什么
-```c++
-UMG_API virtual void NativeOnInitialized();
-UMG_API virtual void NativePreConstruct();
-UMG_API virtual void NativeConstruct();
-UMG_API virtual void NativeDestruct();
-UMG_API virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime);
-```
-`NativePreConstruct` 会调用 `PreConstruct` 这个在蓝图中可实现的函数，`NativeConstruct` 会调用 `Construct` 这个在蓝图中可以实现的函数，其它是类似的
-
-根据 [Widget construct vs preconstruct vs initiliazed events](https://forums.unrealengine.com/t/widget-construct-vs-preconstruct-vs-initiliazed-events/475397)，`PreConstruct` 可以理解为构造函数，并且它设置的值是在编辑器中可见的（覆盖编辑器中原有的设置），而 `Construct` 类似于 `BeginPlay` 回调，在游戏开始时调用。不过没看明白它说的这个 `OnInitialized` 的调用时机
 ### TODO: Owner 的影响，UserWidget 的 Owner 设置为 PlayerController 时会在切换关卡时挂掉，Owner 设置为 GameInstance 是不是就好了
 ### Anchor
 因为我们通常设计 UI 时，总需要一个参考的屏幕的屏幕分辨率来将其可视化。anchor 这个概念要解决的问题是当屏幕分辨率变化时，如何确定新的 UI 布局。首先我们定义什么是 UI 布局：我们使用一个矩形来标定 UI 元素的位置。给定长宽的画布，我们清楚了每个 UI 矩形在画布中的位置和大小，那么就清楚了 UI 布局
@@ -132,14 +120,40 @@ TODO：Create Widget 这个蓝图节点，看起来它是 `UK2Node_CreateWidget`
 
 TODO：调用 `APlayerController::SetShowMouseCursor` 后就能在游戏里看到鼠标了，但三人称模板中要切换视角得按住左键拖着了，为啥
 
-TODO：`AddToViewport` 和 `AddToPlayerScreen` 用于将 user widget 显示在屏幕上，但具体的实现就感觉水很深了。
+TODO：`AddToViewport` 和 `AddToPlayerScreen` 用于将 user widget 显示在屏幕上，但具体的实现就感觉水很深了
+### Initialization Timing
+user widget 中定义的下列初始化函数的调用时机是怎样的，和蓝图中的 PreConstruct，Construct，Event On OnInitialized 等的关系是什么
+```c++
+UMG_API virtual void NativeOnInitialized();
+UMG_API virtual void NativePreConstruct();
+UMG_API virtual void NativeConstruct();
+UMG_API virtual void NativeDestruct();
+UMG_API virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime);
+```
+`NativePreConstruct` 会调用 `PreConstruct` 这个在蓝图中可实现的函数，`NativeConstruct` 会调用 `Construct` 这个在蓝图中可以实现的函数，其它是类似的
+
+根据 [Widget construct vs preconstruct vs initiliazed events](https://forums.unrealengine.com/t/widget-construct-vs-preconstruct-vs-initiliazed-events/475397)，`PreConstruct` 可以理解为构造函数，并且它设置的值是在编辑器中可见的（覆盖编辑器中原有的设置），而 `Construct` 类似于 `BeginPlay` 回调，在游戏开始时调用。不过没看明白它说的这个 `OnInitialized` 的调用时机
+
+TODO：解释 add to view port
+### Widget Construction Flow
+在 C++ 中使用 `CreateWidget` 来产生新的 user widget
+```c++
+template <typename WidgetT = UUserWidget, typename OwnerType = UObject>
+WidgetT* CreateWidget(OwnerType OwningObject, TSubclassOf<UUserWidget> UserWidgetClass = WidgetT::StaticClass(), FName WidgetName = NAME_None)
+```
+实际的工作在 `UUserWidget::CreateInstanceInternal` 中完成
+* 使用 `NewObject` 创建 user widget，根据输入参数的不同，outer 可能是 game instance，world，另一个 user widget，或者 widget tree
+* 设置 local player context
+* 调用 `UUserWidget::Initialize`，如果不是 design time，这里会触发蓝图中的 event on initialized 回调
+
+TODO：解释 add to view port
 
 ### Other Tutorials
 [unreal ben ui](https://benui.ca/unreal/#ui) 中有很多 UI 相关的教程，涵盖了下面 TODO 的许多主题，值得一看。比如 [Introduction to C++ UIs in Unreal](https://benui.ca/unreal/ui-cpp-basics/) 讨论了如何使用 C++ 构建 UI
 TODO：跳过了官方文档中的 [UMG Best Practices](https://dev.epicgames.com/documentation/en-us/unreal-engine/umg-best-practices-in-unreal-engine)
 TODO：官方文档中一些其它的教程 [Tutorials and Examples](https://dev.epicgames.com/documentation/en-us/unreal-engine/tutorials-and-examples-for-user-interfaces-in-unreal-engine)
 TODO：[虚幻5UI系统（UMG）基础（已完结）](https://www.bilibili.com/video/BV1gT41137Vp/)，b 站上的一个 umg 系列教程，主要后面讨论了 UI 动画的东西
-TODO：[UE5 UMG的SDF字体渲染](https://zhuanlan.zhihu.com/p/3295334910)
+TODO：[UE5 UMG的SDF字体渲染](https://zhuanlan.zhihu.com/p/3295334910)，以及 UMG 中的字体设置
 ### Widget Component and Interaction
 TODO：了解 widget component 以及 widget interaction component
 ### SWidget
@@ -147,10 +161,6 @@ TODO：什么是 slate widget
 ### Rendering
 TODO：解释这个布局，通过 slot，我们有子节点的 desired size，有父节点希望子节点的 desired size，与编辑器右上角的 desired screen，fill screen 等选项有关，控制到底用子节点的 desired size，还是父节点希望子节点的 desired size。即理清楚布局算法是如何工作的
 TODO：解释它与 rendering 子系统如何交互
-### Input
-TODO：解释它如何接收 input，以及如何与 enhanced input 系统协作
-
-
 
 
 ### ActionRPG UI Notes
