@@ -1,10 +1,16 @@
 slate 的官方文档：[Slate UI Framework](https://dev.epicgames.com/documentation/en-us/unreal-engine/slate-user-interface-programming-framework-for-unreal-engine)
 
-[UE4 Slate基础](https://zhuanlan.zhihu.com/p/692551733) 也讲得不错，但是它主要关心的是渲染
+[UE4 Slate基础](https://zhuanlan.zhihu.com/p/692551733) 以及第二篇 [UE Slate渲染流程](https://zhuanlan.zhihu.com/p/695693711)也讲得不错，但是它主要关心的是渲染
+
+TODO：想到的一些事情
+* ui 绘制的原理，swindow 和 sviewport 有什么区别，如何像 [UE4 Runtime模式下自定义视口](https://zhuanlan.zhihu.com/p/432193342) 中讨论的自定义视口等
+* swidget 添加到屏幕，以及动画
+* swidget 的回收，movie player 的原理（在哪个线程绘制的）
+* slate animation 能做屏幕环状地变黑吗，感觉有点困难啊，后处理能做吗
 ### Slate Construction
-`SWidget` 采取了 builder pattern 来组织自己的构造函数，并且 builder 的类型名统一为 `SMyWidget::FArguments`。通常会使用 `SLATE_BEGIN_ARGS` 来声明 builder，然后利用 `SLATE_XXX` 宏来定义 builder 的成员变量。最后是 `SLATE_END_ARGS` 宏结束 builder 的定义。这之后就是定义 widget 自身的成员变量了，builder 的成员变量一般是用来给 widget 中的成员变量赋值的，但它们并不需要一一对应
+`SWidget` 采取了 builder pattern 来组织自己的构造函数，并且 builder 的类型名统一为 `SMyWidget::FArguments`。通常会使用 `SLATE_BEGIN_ARGS` 来声明 builder，然后利用 `SLATE_XXX` 宏来定义 builder 的成员变量。最后是 `SLATE_END_ARGS` 宏结束 builder 的定义。这之后就是定义 widget 自身的成员变量了，builder 的成员变量一般是用来给 widget 中的成员变量赋值的，但它们并不需要一一对应。例如 `SCompoundWidget` 子类通常的定义形式如下
 ```c++
-class SMyWidget: public SParentWidget
+class SMyWidget: public SCompoundWidget
 {
 	SLATE_BEGIN_ARGS( SMyWidget )
 	// 构造函数
@@ -25,7 +31,7 @@ builder 的声明中最常见的有下面这些 `SLATE_XXX` 宏
 * `SLATE_ARGUMENT`，声明一个普通的成员变量，通常用来给一个 swidget 中普通的成员变量赋值
 * `SLATE_ATTRIBUTE`，声明一个可以绑定回调函数的成员变量，通常用来给 swidget 中 `TSlateAttribute` 模板类型的成员变量赋值，如果绑定了代理，那么 slate 每次会调用绑定的代理来获取成员变量的值
 * `SLATE_EVENT`，声明一个代理，便于用户绑定事件回调，这里代理通常会赋值给 swidget 中的某个代理类型的成员变量
-* `SLATE_DEFAULT_SLOT`，声明一个 swidget 成员变量引用，在 `SCompoundWidget` 的子类中很常见，它用来指示 `SCompoundWidget` 唯一包含的子 swidget（`ChildSlot` 字段）
+* `SLATE_DEFAULT_SLOT`，声明一个 swidget 成员变量引用，在 `SCompoundWidget` 的子类中很常见，它用来指示 `SCompoundWidget` 唯一包含的子 swidget
 
 每个 swidget 需要有自己的 `Construct` 方法，定义如何通过 `FArguments` 来初始化自己的各个成员
 ```c++
@@ -33,11 +39,46 @@ builder 的声明中最常见的有下面这些 `SLATE_XXX` 宏
 ```
 这里有点傻逼的是，虽然 swidget 之间有继承关系，但是 swidget 的 `FArguments` 之间是没有继承关系的，这意味着子类的 `FArguments` 不仅要定义子类的成员变量初始化需要的信息，还需要定义所有父类需要的信息。例如父类的 `FArguments` 定义了 `SLATE_DEFAULT_SLOT`，子类的 `FArguments` 还是需要定义 `SLATE_DEFAULT_SLOT`
 
+slot 是联系 swidget 父子关系的桥梁，也会定义子 swidget 在父 swidget 中的相对布局。`SCompoundWidget` 的子类只有一个子 swidget，因此 slot 已经在 `SCompoundWidget` 的 `ChildSlot` 字段定义好了。`SPanel` 的子类可以有多个子 swidget，它需要自己定义 slot 的形式。slot 的定义使用 `SLATE_SLOT_BEGIN_ARGS` 和 `SLATE_SLOT_END_ARGS` 宏，也是类似的 builder pattern。命名上来说，通常 `SMyWidget::FSlot` 是该 widget 的 slot 类型，而 `SMyWidget::FSlot::FSlotArguments` 是该 slot 的 builder type。然后在 `SMyWidget` 的 builder 声明中，将 `SLATE_DEFAULT_SLOT` 换成的 `SLATE_SLOT_ARGUMENT`。而 `SPanel` 的子类通常会定义一个 `TPanelChildren` 类型的字段，这些 slot 存储在这个类里面
 
-
-解释 swidget 的 build 语法，以及 + 号，中括号
+我们通常看到的创建 swidget 的语法如下，`SNEW(SMyWidget)` 约等于是帮我们在堆上创建一个 swidget 的同时在栈上新建一个 swidget 的 builder，因此后续的方法调用都是调用的 builder 的方法来填充 builder 的字段，然后会自动调用 swidget 的 construct 方法，来用 builder 初始化 swidget，然后返回初始化好的 swidget
+```c++
+		FullScreenCanvas = SNew(SConstraintCanvas)
+			+ SConstraintCanvas::Slot()
+			.Offset(OffsetArgument.Get<0>())
+			.AutoSize(OffsetArgument.Get<1>())
+			.Anchors(Slot.Anchors)
+			.Alignment(Slot.Alignment)
+			.Expose(RawSlot);
+```
+`SLATE_DEFAULT_SLOT` 宏会为 builder 定义 `operator[]` 的重载，用于填充唯一的子 swidget。而 `SLATE_SLOT_ARGUMENT` 会为 builder 定义 `operator+` 的重载，用于添加子 swidget
 
 TODO：解释 `SLATE_ATTRIBUTE` 和 UMG 中 property binding 的关系
+### Slate Rendering and Animation
+`FEngineLoop::Tick` 中会调用 slate application 的 tick，这里会调用 swidget 的 tick 以及进行 UI 绘制。因此 swidget 的 tick 函数依然是在 game thread 上调用的
+
+通过 `SThrobber` 类的实现，我们可以大概知道怎么在 slate 中做 animation
+* `FCurveSequence` 是若干 `FSlateCurve` 的集合，每个 `FSlateCurve` 有自己的 start time 和 duration，以及 `ECurveEaseFunction` 枚举变量定义的曲线形状。TODO：如果需要数值驱动的自定义曲线就得自己写吗？
+* 以函数绑定的形式注册需要 animate 的属性值，然后该函数从 curve 中获取相应的数据即可。我们可以通过 slate application 的 `GetCurrentTime` 函数来获取当前的时间，这个已经在 `FCurveSequence` 中封装好了
+
+如果要做 loading screen 的话，用 tick 函数更新数据不是一个特别合适的选项，因为 tick 是在 game thread 中调用的，而此时 game thread 在加载 map package 卡住了
+
+TODO：但是按这个说法 slate application 的 tick 函数也是在 game thread 中调用，那 UI 屏幕的绘制不也卡住了？所以 movie player 实际上是在另一个线程中绘制的屏幕，这里得再看一下
+
+#### Movie Player
+* [UE4之LoadingScreen机制](https://www.cnblogs.com/kekec/p/11593225.html)：讨论 movie player 模块的实现
+* [FestEurope2019 异步载入界面和过渡关卡](https://www.bilibili.com/video/BV1XE41147dQ/?vd_source=2f38c661a6672237a3f59835e4bfb1a5)：讨论如何设计异步的加载界面
+	* 不要直接与 engine 打交道，加一个中间层模块来做，事实上，action rpg 就额外引用了一个 loading screen 模块
+	* 提到了 seamless travel，用于 client / server 场景
+
+movie player 是一个实现了 async loading screen 的模块，功能的默认实现为 `FDefaultGameMoviePlayer` 类。一些关键点包括
+* 用户通过 `SetupLoadingScreen` 函数来设置 loading screen 的外观
+* `FDefaultGameMoviePlayer::Initialize` 中创建了 `SVirtualWindow`，并且向 `PreLoadMap` 代理注册了回调 `OnPreLoadMap`， `PreLoadMap` 代理会在 level transition 一开始的时候被调用
+* 在 `OnPreLoadMap` 中它将用户设置的 swidget 填充到 virtual window 上，然后新启动一个 slate 线程，这个新线程负责绘制，并向 `PostLoadMapWithWorld` 代理注册回调 `OnPostLoadMap`
+* 在 `OnPostLoadMap` 中，它将用户设置的 swidget 填充到 main window 上，销毁 slate 线程，如果还没到用户设置的最短播放时间，那么就进入一个 while loop，在这个 loop 里继续渲染（这里相当于把 slate 线程上渲染又切回到 game 线程上了），直到达到最短的播放时间，函数返回，game 线程恢复正常
+
+TODO：slate render 的细节，`SWindow` 和 `SVirtualWindow` 有什么区别，`SViewport` 起个什么作用
+
 ### Input Routing
 这一节我们讨论 slate 是如何处理用户输入的，我们希望捋清楚输入什么时候会发送到 UI，什么时候又会发送到 game logic
 #### Basic Concepts
@@ -151,6 +192,10 @@ FReply SObjectWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& In
 * 处理 `FReply` 包含的 navigation 请求。如果 `FReply` 的 `NavigationType` 不为 invalid，那么 slate application 需要根据当前的 focus swidget 和 `NavigationType` 指示的方向，在当前的 UI 布局中寻找下一个 focus swidget
 * 处理 `FReply` 包含的 mouse capture 请求 如果 `FReply` 的 `bSetUserFocus` 非空，需要计算从 `RequestedFocusRecepient` 指定的 `SWidget` 到根节点的 widget path，用于下次按键时的响应
 * 还有就是例如 `OnMouseCaptureLost`，`OnFocusChanging`，`OnFocusLost` 等各种回调的调用
+
+UE 用 grid 划分来加速鼠标点击时计算 widget path 的过程，这里可参考 
+* [UE·底层篇 Slate源码分析——点击事件的触发流程梳理](https://zhuanlan.zhihu.com/p/448050955)
+* [UEInside HittestGrid点击机制剖析](https://zhuanlan.zhihu.com/p/346460371)
 
 TODO：解释 `FReply` 包含的一些其它操作，例如 mouse drag and drop operation，mouse lock，set cursor position 等
 TODO：解释 `UWidget` 的 `Navigation` 字段是如何影响 slate application 的 navigation 搜索的

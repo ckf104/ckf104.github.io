@@ -7,7 +7,7 @@
 ### Slate Brush
 这个结构体来指定一个 UI 元素的外观。例如 button 就包含 normal，pressed，hovered，disabled 四个 slate brush 来指定各种状态下 button 的外观
 
-TODO：解释 slate brush中各个字段的含义，以及它如何控制渲染效果
+TODO：解释 slate brush 中各个字段的含义，以及它如何控制渲染效果
 ### UPanelWidget and UPanelSlot
 `UPanelWidget` 的子类才有子节点，有 1 个还是多个子节点取决于 `bCanHaveMultipleChildren` 字段的值，在 `UPanelWidget` 的构造函数中默认为 true
 
@@ -39,7 +39,7 @@ TObjectPtr<UWidget> RootWidget;
 ```
 这个 root widget 就是整个层次节点的根了，然后非叶子节点都是 panel widget 或者 `INamedSlotInterface` 的子类，它可以继续延伸出子节点，由此展开成了一整棵树
 ### Named Slot
-`INamedSlotInterface` 提供了另一种以名称来标记子节点的方式（相比于 panel widget 通过序号来标记）。它最典型的子类就是 user widget。我们在 umg editor 中新定义的 user widget A作为 ui 节点放到另一个 user widget B中时，默认情况下是不能作为父节点的，因为它没有继承 panel widget（因此使用 widget tree 提供的 `ForWidgetAndChildren` 函数对 B 进行遍历时也看不到 A 内部的子节点）。但由于它是 named slot interface 的子类，因此可以使用 named slot 来提供子节点
+`INamedSlotInterface` 提供了另一种以名称来标记子节点的方式（相比于 panel widget 通过序号来标记）。它最典型的子类就是 user widget。我们在 umg editor 中新定义的 user widget A 作为 ui 节点放到另一个 user widget B中时，默认情况下 ser widget A 是不能作为父节点，添加额外的 widget 挂在它下面的，因为它没有继承 panel widget（因此使用 widget tree 提供的 `ForWidgetAndChildren` 函数对 B 进行遍历时也看不到 A 内部的子节点）。但由于它是 named slot interface 的子类，因此可以使用 named slot 来提供子节点
 
 具体来说，我们在自定义 user widget A 时加入 named slot 作为占位符。这样在将 A 放入正在定义的 user widget B 时就可以将子节点加入到 A 的 named slot 下了。对应到 C++ 中的字段，`UWidgetBlueprintGeneratedClass` 的 `InstanceNamedSlots` 字段记录了它的 user widget 类有哪些 named slot（`UWidgetBlueprintGeneratedClass` 是 UClass 的子类）
 ```c++
@@ -52,6 +52,9 @@ TArray<FName> InstanceNamedSlots;
 UPROPERTY()
 TArray<FNamedSlotBinding> NamedSlotBindings;
 ```
+举一个例子，假设我们在设计 user widget A 时使用了 named slot 作为占位符，然后在设计 user widget B 时将 user widget A 作为子节点添加进去，并在 user widget A 的 named slot 下挂了一个 button C。那么现在 user widget A 的蓝图产生类中 `InstanceNamedSlots` 就包含 named slot 的名字。并且实例化一个 user widget B 时，得到的 user widget A 实例的 `NamedSlotBindings` 会包含 named slot 的名字和 button C 这个 pair。并且 button C 作为子节点挂载在 named slot 下
+
+此时在调用 user widget B 的 widget tree 的 `ForEachWidget` 遍历时，会遍历到 user widget B 自己的节点（包括 user widget A）以及 button C，但是不会遍历到 user widget A 内部的节点（包括 named slot）。而调用 user widget A 的 widget tree 的 `ForEachWidget` 遍历时，会遍历到 user widget A 内的所有节点（包括 button C，因为 named slot 是 `UPanelWidget` 的子类
 
 TODO：理解 widget tree 为啥是 `INamedSlotInterface` 的子类
 ### HUD
@@ -132,6 +135,8 @@ UMG_API virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime);
 ```
 `NativePreConstruct` 会调用 `PreConstruct` 这个在蓝图中可实现的函数，`NativeConstruct` 会调用 `Construct` 这个在蓝图中可以实现的函数，其它是类似的
 
+而具体的调用时机，在 design time 时，只有 `NativePreConstruct` 会被调用。而在非 design time 时，`NativeOnInitialized` 是在 user widget 创建时调用，而 `NativePreConstruct` 和 `NativeConstruct` 是在 user widget 创建内部的 swidget 时调用（通常是调用 `AddToViewport` 函数时）。而 `NativeDestruct` 是在该 user widget 的 `MyGCWidget` 析构时调用，关于 `MyGCWidget` 的讨论，见 Widget Management 一节
+
 根据 [Widget construct vs preconstruct vs initiliazed events](https://forums.unrealengine.com/t/widget-construct-vs-preconstruct-vs-initiliazed-events/475397)，`PreConstruct` 可以理解为构造函数，并且它设置的值是在编辑器中可见的（覆盖编辑器中原有的设置），而 `Construct` 类似于 `BeginPlay` 回调，在游戏开始时调用。不过没看明白它说的这个 `OnInitialized` 的调用时机
 
 TODO：解释 add to view port
@@ -145,9 +150,126 @@ WidgetT* CreateWidget(OwnerType OwningObject, TSubclassOf<UUserWidget> UserWidge
 * 使用 `NewObject` 创建 user widget，根据输入参数的不同，outer 可能是 game instance，world，另一个 user widget，或者 widget tree
 * 设置 local player context
 * 调用 `UUserWidget::Initialize`，如果不是 design time，这里会触发蓝图中的 event on initialized 回调
+### Widget Management
+uwidget 的 `MyWidget` 指向了它对应的 swidget，它一般是子类重载 `RebuildWidget`，然后使用 `SNEW` 那一套语法生成的
+```c++
+	/** The underlying SWidget. */
+	TWeakPtr<SWidget> MyWidget;
 
-TODO：解释 add to view port
+	/** The underlying SWidget contained in a SObjectWidget */
+	TWeakPtr<SObjectWidget> MyGCWidget;
+```
+通常 uwidget 的子类会有自己的指向 swidget 的指针，例如 button 的 `MyButton` 字段，但它和父类的 `MyWidget` 字段指向的是同一个 swidget，不知道为什么这么设计
+```c++
+	/** Cached pointer to the underlying slate button owned by this UWidget */
+	TSharedPtr<SButton> MyButton;
+```
+因为 uworld 中没有对 uwidget 的引用，因此额外引入了通常只用于 user widget 的 `MyGCWidget` 字段，来避免 uwidget 被垃圾回收。`SObjectWidget` 是 `FGCObject` 的子类，会为它包含的 user widget 添加引用。在 uwidget 添加到 viewport 时会调用的 `UWidget::TakeWidget` 函数中如果发现该 widget 是 user widget，并且 `MyGCWidget` 还未指向一个合法的 `SObjectWidget`，那就会创建一个新的 `SObjectWidget`，并把这个 `SObjectWidget` 作为 `TakeWidget` 函数的结果
 
+总的来说，一个 user widget 在加入 viewport 时，会创建对应 `SObjectWidget`，它保证了该 user widget 不被垃圾回收，然后 user widget 对 widget tree 的引用，widget 中父类包含的 slot，slot 对子类的引用，这些引用都有 uproperty 标记，这样保证了 user widget 下面的所有 widget 都不会被回收，而当 `SObjectWidget` 析构时，这些 uwidget 也随之被垃圾回收掉（如果一个 user widget A 被包含在另一个 user widget B 中，为 user widget A 生成对应的 `SObjectWidget` 感觉就有些多余了，此时 `SObjectWidget` 的作用就只剩下在析构时调用 user widget 的 `NativeDestruct` 回调了吧）
+
+而 swidget 这边则总是使用共享指针。因此只要有地方持有 `SObjectWidget` 的共享指针，`SObjectWidget` 就不会被析构
+#### Show Widget in Viewport
+`UGameViewportSubsystem` 是属于 `UEngine` 的 subsystem 类，它提供了把 uwidget 添加到 viewport 的接口，并且它的 `ViewportWidgets` 字段负责对 uwidget 进行管理
+```c++
+class UGameViewportSubsystem : public UEngineSubsystem
+{
+	struct FSlotInfo
+	{
+		FGameViewportWidgetSlot Slot;
+		TWeakObjectPtr<ULocalPlayer> LocalPlayer;
+		TWeakPtr<SConstraintCanvas> FullScreenWidget;
+		SConstraintCanvas::FSlot* FullScreenWidgetSlot = nullptr;
+	};
+	
+	using FViewportWidgetList = TMap<TObjectKey<UWidget>, FSlotInfo>;
+	FViewportWidgetList ViewportWidgets;
+};
+```
+在我们调用 user widget 的 `AddToViewport` 函数时，会转发到 `UGameViewportSubsystem` 的 `AddToScreen`
+```c++
+	bool AddToScreen(UWidget* Widget, ULocalPlayer* Player, FGameViewportWidgetSlot& Slot);
+```
+`FGameViewportWidgetSlot` 的定义如下，主要是用来控制 user widget 在 viewport 上的相对位置的。如果 `UGameViewportSubsystem` 的 `ViewportWidgets` 中不包含该 uwidget，那么函数的 `Slot` 的参数就会使用默认构造函数初始化的 `FGameViewportWidgetSlot`，从下面的定义可以看出，这样 uwidget 会覆盖整个屏幕
+```c++
+USTRUCT(BlueprintType)
+struct FGameViewportWidgetSlot
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "User Interface")
+	FAnchors Anchors = FAnchors(0.f, 0.f, 1.f, 1.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "User Interface")
+	FMargin Offsets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "User Interface")
+	FVector2D Alignment = FVector2D(0.f, 0.f);
+
+	/** The higher the number, the more on top this widget will be. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "User Interface")
+	int32 ZOrder = 0;
+
+	/**
+	 * Remove the widget when the Widget's World is removed.
+	 * @note The Widget is added to the GameViewportClient of the Widget's World. The GameViewportClient can migrate from World to World. The widget can stay visible if the owner of the widget also migrate.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "User Interface")
+	bool bAutoRemoveOnWorldRemoved = true;
+};
+```
+可以在调用 `AddToViewport` 前先调用 user widget 的 `SetPositionInViewport` 等函数来调整 user widget 在 viewport 上的相对位置
+```c++
+	/**
+	 * Sets the widgets position in the viewport.
+	 * @param Position The 2D position to set the widget to in the viewport.
+	 * @param bRemoveDPIScale If you've already calculated inverse DPI, set this to false.  
+	 * Otherwise inverse DPI is applied to the position so that when the location is scaled 
+	 * by DPI, it ends up in the expected position.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintCosmetic, Category="User Interface|Viewport")
+	UMG_API void SetPositionInViewport(FVector2D Position, bool bRemoveDPIScale = true);
+
+	/*  */
+	UFUNCTION(BlueprintCallable, BlueprintCosmetic, Category="User Interface|Viewport")
+	UMG_API void SetDesiredSizeInViewport(FVector2D Size);
+```
+回到 `AddToScreen` 的实现，它调用传入的 uwidget 的 `TakeWidget` 函数，获取到对应的 swidget，然后新建一个 `SConstraintCanvas`，将该 swidget 作为一个 slot 添加到 `SConstraintCanvas` 里。然后调用 `UGameViewportClient` 类的 `AddViewportWidgetContent` 函数，将新建的 `SConstraintCanvas` 又作为一个 slot 添加到 `UGameViewportClient` 的 `ViewportOverlayWidget` 这个 `SOverlay` 中。这样就把 swidget 添加到全局的 swidget tree 中，slate 的渲染模块就会绘制它了
+```c++
+void UGameViewportClient::AddViewportWidgetContent( TSharedRef<SWidget> ViewportContent, const int32 ZOrder )
+{
+	TSharedPtr< SOverlay > PinnedViewportOverlayWidget( ViewportOverlayWidget.Pin() );
+	if( ensure( PinnedViewportOverlayWidget.IsValid() ) )
+	{
+		PinnedViewportOverlayWidget->AddSlot( ZOrder )
+			[
+				ViewportContent
+			];
+	}
+}
+```
+如果我们希望将 C++ 编写的 swidget 添加到屏幕上，略去前面的步骤，直接调用 `UGameViewportClient` 的 `AddViewportWidgetContent` 即可
+#### Slate in Level Transition
+在 `UGameViewportSubsystem` 的初始化中注册了下面三个回调
+```c++
+void UGameViewportSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	
+	//FWorldDelegates::LevelRemovedFromWorld.AddUObject(this, &ThisClass::HandleLevelRemovedFromWorld);
+	FWorldDelegates::OnWorldCleanup.AddUObject(this, &ThisClass::HandleWorldCleanup);
+	FWorldDelegates::OnWorldBeginTearDown.AddUObject(this, &ThisClass::HandleRemoveWorld);
+	FWorldDelegates::OnPreWorldFinishDestroy.AddUObject(this, &ThisClass::HandleRemoveWorld);
+}
+```
+这三个回调的调用时机分别是（不知道为啥这三个代理都注册了回调）
+* `UWorld::BeginTearingDown` 中会广播 `OnWorldBeginTearDown`，而这个函数在 `UWorld::LoadMap` 中具体执行 level transition 的逻辑前会被调用
+* `UWorld::CleanupWorldInternal` 中会在实际进行 world cleanup 前广播 `OnWorldBeginTearDown`。这个函数也是在 `UWorld::LoadMap` 执行 level transition 的时候调用，调用它之前各个 actor 已经执行过 endplay 的逻辑了
+* `OnPreWorldFinishDestroy` 回调是在 world 的 `FinishDestroy` 中执行具体的 destroy 操作前调用的
+
+`HandleWorldCleanup` 就是 `HandleRemoveWorld` 的 wrapper。而 `HandleRemoveWorld` 的实现也很简单，就是遍历 `ViewportWidgets` 字段，然后移除所有的 slot 的 `bAutoRemoveOnWorldRemoved` 为 true 的 uwidget，同时将其从 `UGameViewportClient` 的 `SOverlay` 中删除。因此 level transition 后 UI 会消失，需要重新创建
+
+如果需要 UI 跨 level 存在，需要将 slot 的 `bAutoRemoveOnWorldRemoved` 设置为 false，并使用 C++ 的 `CreateWidget` 来创建 user widget，并设置 user widget 的 outer 为 game instance
 ### Other Tutorials
 [unreal ben ui](https://benui.ca/unreal/#ui) 中有很多 UI 相关的教程，涵盖了下面 TODO 的许多主题，值得一看。比如 [Introduction to C++ UIs in Unreal](https://benui.ca/unreal/ui-cpp-basics/) 讨论了如何使用 C++ 构建 UI
 TODO：跳过了官方文档中的 [UMG Best Practices](https://dev.epicgames.com/documentation/en-us/unreal-engine/umg-best-practices-in-unreal-engine)
