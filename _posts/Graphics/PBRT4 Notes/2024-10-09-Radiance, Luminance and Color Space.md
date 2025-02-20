@@ -42,8 +42,27 @@ $$
 L(p,w) = \int_{\lambda_1}^{\lambda_2}L(p,w,\lambda)d\lambda
 $$
 ## 色彩空间
+pbrt4 4.6 节在一些细节上讲得有些含糊。[如何从最初的颜色匹配实验导出 CIE 1931 RGB 颜色匹配函数](https://zhajiman.github.io/post/color_matching_function/) 这篇讲得特别好。我们首先区分两个概念：color matching function 和 light emission function，后者可以理解为我们选取的基色光的频谱功率分布，前者用来决定要合成一个给定的频谱功率分布时，每组基色光的数目。具体来说，假设三组基色光对应的色匹配函数分别是 $X(\lambda),Y(\lambda),Z(\lambda)$。那要合成一个频谱功率分布 $S(\lambda)$ 对应的颜色和亮度，需要三组基色光的份数分别是
+$$
+r = \int X(\lambda)S(\lambda)d\lambda, \quad g = \int Y(\lambda)S(\lambda)d\lambda, \quad b = \int Z(\lambda)S(\lambda)d\lambda
+$$
+然后我们来讨论在选取了三组基色光后，如何获取对应的色匹配函数。根据 [如何从最初的颜色匹配实验导出 CIE 1931 RGB 颜色匹配函数](https://zhajiman.github.io/post/color_matching_function/) 所描述的方法，第一步是用三组基色光去匹配白光，假定我们用 2 份红光，1 份绿光，4 份蓝光合成了白光，因为我们希望红绿蓝一比一的时候得到白光。因此就约定 1 份基色红光就是原来的 4 份红光，1 份基色绿光就是原来的 2 份绿光，1 份基色蓝光就是原来的 1 份红光。现在我们去拟合各个频率的单色光。举个例子，假设为了匹配波长为 410 纳米的光的颜色，使用了 4 份红光，1 份绿光，2 份蓝光，那么对应的基色光份数就是 2 份基色红光，1 份绿光，0.5 份基色蓝光。我们将这个系数归一化，得到波长为 410 纳米的光需要的基色比例为 $(0.571, 0.286, 0.143)$，这称为该颜色的色度系数，拟合完各个波长，我们就可以得到各个波长的色度系数 $R(\lambda),G(\lambda),B(\lambda)$
 
-从 [color matching function](https://zhajiman.github.io/post/color_matching_function/) 最大的 takeaway 是区分 color matching function 和 light emission function，前者积分的结果决定发出的光线中后者的份数。在 light emission function 确定后，通过实验测量能够获得它对应的 color matching function。我觉得 pbrt4 中没有很好地区分两者，(4.24) 的推导是有些问题的，虽然后面的 RGB color space 的部分没啥问题。我觉得 (4.24) 更正确的写法应该是
+色度系数只指明了要匹配指定波长的光，需要的基色光的比例，但具体需要多少份基色光是由亮度决定的。亮度也是一个非物理的，人类感知上的概念，给定频谱功率分布 $S(\lambda)$，它的亮度或者流明通量 $v$ 计算为（可以看出，亮度的计算也是线性的，即两束光的复合的亮度是它们各自的亮度之和）
+$$
+v = K\int S(\lambda)V(\lambda)d\lambda
+$$
+其中 $K$ 是常量，$V(\lambda)$ 称之为光度函数。因为各个波长的光的亮度不一样，所以我们需要给色度系数乘以矫正因子 $k(\lambda)$ 以保证亮度匹配。根据 [如何从最初的颜色匹配实验导出 CIE 1931 RGB 颜色匹配函数](https://zhajiman.github.io/post/color_matching_function/) 中的推导，有
+$$
+k(\lambda) = \frac{KV(\lambda)}{L^rR(\lambda) + L^gG(\lambda) + L^bB(\lambda)}
+$$
+其中 $L^r,L^g,L^b$ 分别表示一份基色红光，蓝光，绿光的亮度。最后的色匹配函数 $X(\lambda),Y(\lambda),Z(\lambda)$就是
+$$
+X(\lambda) = k(\lambda)R(\lambda),\quad Y(\lambda) = k(\lambda)G(\lambda),\quad Z(\lambda) = k(\lambda)B(\lambda)
+$$
+这里的 $k(\lambda)$ 修正就使得份数为 $X(\lambda),Y(\lambda),Z(\lambda)$ 的基色光的组合亮度恰好为 $KV(\lambda)$，即单位功率的波长为 $\lambda$ 的单色光的亮度
+
+我觉得 pbrt4 中没有很好地区分 color matching function 和 light emission function，(4.24) 的推导是有些问题的，虽然后面的 RGB color space 的部分没啥问题。我觉得 (4.24) 更正确的写法应该是
 $$
 \displaylines{
 x = \int X(\lambda)S(\lambda)d\lambda \approx \int X(\lambda)(rR_e(\lambda)+gG_e(\lambda)+bB_e(\lambda))d\lambda
