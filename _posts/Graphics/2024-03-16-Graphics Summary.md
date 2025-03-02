@@ -9,7 +9,7 @@ categories: [Graphics]
 
 * local  space：以待渲染的物体为中心的坐标系
 * world space：将所有待渲染的物体都容纳进来的坐标系
-* view space：以摄像机为原点的坐标系（这里应当先把摄像机平移到原点，再按照摄像机的朝向旋转）
+* view space：以摄像机为原点的坐标系（这里应当先把摄像机平移到原点，再按照摄像机的朝向旋转），**其中 up 方向指定了世界坐标系中哪个方向作为屏幕空间中向上的 y 轴**
 * clip space：经过投影变换后，坐标范围缩到 -1, 1 的坐标系
 * model matrix 将物体从 local space 变换到 woxrld space，view matrix 将物体从 world space 变换到 view space，projection matrix 将物体从 view space 变换到 clip space
 * 关于为什么会有 local space，因为在建模的时候，通常是一个物体一个物体建模，因此得到的物体坐标总是以物体为中心的。另外，如果我们希望画大量重复物体，那么只用一组坐标，然后通过变换得到若干相同的物体是更可取的。local space 到 world space 施加变换的顺序通常是 scaling，rotation，translation。在 local space 进行 scaling，使得 scaling 的结果不依赖于 rotation 的选择
@@ -22,8 +22,16 @@ categories: [Graphics]
 * glClipControl 中 depth 变换使用 GL_ZERO_TO_ONE（因为 OpenGL 默认会认为在 vertex shader 中输出的 z 值范围是 -1 到 1，然后它会利用 glDepthRange 给出了 n 和 f 值将 depth 变换到 0 到 1，这个函数就是告诉 OpenGL 我们输出的 depth 值已经在 0 到 1 了）
 
 * 我们可以将远平面拉伸到无限远处，f -> 无穷大，得到极限情况下的透视矩阵（我觉得这个透视矩阵才符合现实）
-* 对于透视矩阵的讨论，[深入理解透视矩阵](https://www.zhyingkun.com/perspective/perspective/) 中讲得比较全面，**我觉得最终的透视矩阵依赖于这几点：坐标系手性，摄像机看向 +Z 还是 -Z 轴（貌似右手坐标系中固定看向 -Z 轴，而左手坐标系中固定看向 +Z 轴？），深度映射的范围（0 到 1 还是 -1 到 1，是否需要 reverse Z）**
-
+### 手系对变换矩阵的影响
+从 glm 的源码中可以看出，左手系和右手系，以及其它一些因素都会对最终的变换矩阵产生影响
+* model 变换不受影响
+* view 变换会受影响。左手系中通常摄像机看向 z 的正半轴，而右手系中摄像机看向 z 的负半轴。通常的 lookAt 函数要求 eye pos 和 focal point 参数，因此左右手系会决定到底 z 轴是朝哪边的，进一步影响 view 变换的结果
+* 投影变换会受影响。虽然从 [深入理解透视矩阵](https://www.zhyingkun.com/perspective/perspective/) 的推导可以看出，当透视投影矩阵的 $n$ 和 $f$ 是带符号的坐标值时，投影变换的形式是不依赖于手系的，但在实际的实现中，有两个方面的因素导致它会受到手系的影响
+	* 一个是这些数学库提供的接口都假定用户传入的 $n,f$ 是不带符号的绝对值，这使得库内部的实现需要分辨用户使用的是左手系还是右手系
+	* 另一个是习惯上，右手系的透视投影矩阵会整体乘以 -1（由齐次性，这不会改变矩阵的变换），使得右手系下 $m[3][2]$ 的值为 -1 而不是 1，便于用户分辨
+* 除了手系外，深度映射的范围（0 到 1 还是 -1 到 1，是否需要 reverse Z）也会影响投影变换的形式
+* OpenGL 等图形学 API 本身是没有手系这个概念的，但约定了屏幕坐标系中原点在屏幕左下方
+* 右手系摄像机看向 z 轴负方向，而左手系摄像机看向 z 轴正方向。这个约定我觉得是为了匹配屏幕坐标系中原点在屏幕左下方这个约定。如果不这样做，例如右手系下摄像机看向 z 轴正方向，就会感觉渲染出来的结果和三维空间想象的结果左右或者上下翻折了
 ### Pinhole Camera Model
 
 真实的 pinhole camera model，内参矩阵：fx, fy, cx, cy，见 [Why does the focal length in the camera intrinsics matrix have two dimensions?](https://stackoverflow.com/questions/16329867/why-does-the-focal-length-in-the-camera-intrinsics-matrix-have-two-dimensions) 的讨论，高赞回答引用的 learn opencv 一书中的描述解释得很到位
