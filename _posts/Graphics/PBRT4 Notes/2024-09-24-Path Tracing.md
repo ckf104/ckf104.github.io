@@ -144,9 +144,24 @@ $$ 因此 Russian Roulette 不影响期望
 #### 能量守恒分析
 
 在我们渲染的场景中，光源时时不断地向场景中发出能量，另一方面，除开镜面反射等材质会完全反射掉入射能量外，大部分材质除反射外，都会吸收一部分能量，即$$
-\int f_s(x,w_i,w_o)cos\theta dw < 1
-$$光源的能量发射和材质的能量吸收使得场景中的能量保持动态平衡，这个动态平衡的 radiance 分布也就是渲染方程的解。那如果场景中所有问题，都有 $$
-\int f_s(x,w_i,w_o)cos\theta dw \ge 1
-$$在这种情况下应用 Path Tracing，得到的 radiance 解是什么样的呢？在光线每次弹射时，代码中更新 β 值$$ \beta_{new} = \beta\frac{f_s(x,w_i,w_o)cos\theta}{p(w)}$$在重要性采样中我们通常选取的 $p(w)$ 与 $f_s(x,w_i,w_o)cos\theta$ 有成比例的大小，由于 $\int f_s(x,w_i,w_o)cos\theta dw \ge 1$ 并且 $\int p(w)dw = 1$，因此大概率会有 $$
-\frac{f_s(x,w_i,w_o)cos\theta}{p(w)} \ge 1
+\int f_s(x,w_i,w_o)cos\theta_i dw_i < 1
+$$光源的能量发射和材质的能量吸收使得场景中的能量保持动态平衡，这个动态平衡的 radiance 分布也就是渲染方程的解。那如果场景中所有材质，都有 $$
+\int f_s(x,w_i,w_o)cos\theta_i dw_i \ge 1
+$$在这种情况下应用 Path Tracing，得到的 radiance 解是什么样的呢？在光线每次弹射时，代码中更新 β 值$$ \beta_{new} = \beta\frac{f_s(x,w_i,w_o)cos\theta_i}{p(w_i)}$$在重要性采样中我们通常选取的 $p(w)$ 与 $f_s(x,w_i,w_o)cos\theta_i$ 有成比例的大小，由于 $\int f_s(x,w_i,w_o)cos\theta_i dw_i \ge 1$ 并且 $\int p(w)dw = 1$，因此大概率会有 $$
+\frac{f_s(x,w_i,w_o)cos\theta_i}{p(w)} \ge 1
 $$这意味着，随着光线的弹射，β 值不会收敛到 0，或者说路径对结果 radiance 的贡献不会随着路径长度的增加而减少，即 $(3)$ 式不能够收敛
+#### Update: BRDF 能量守恒的理解
+根据 [关于 BRDF 的能量守恒问题](https://games-cn.org/forums/topic/guanyu-brdf-denengliangshouhengwenti/)，一种简单理解 brdf 能量守恒的方式是，我们考虑 brdf 接收一个 $w_i$ 方向传来的点光源的光照，有
+$$
+\displaylines{
+L_{i}(w_i) = \delta(w_i)  \\
+E_{i} = \int L_{i}(w_{in})cos\theta_{in} dw_{in} = cos\theta_{i} \\
+L_{o}(w_o) = \int L_i(w_{in})f(w_{in},w_o)cos\theta_{in} dw_{in} = f(w_i,w_o)cos\theta_i \\
+E_o = \int L_o(w_o)cos\theta_o dw_o = cos\theta_i\int f(w_i,w_o)cos\theta_o dw_o
+}
+$$
+其中 $E_{i}$ 表示入射的 irrdiance，$E_o$ 表示出射的 irradiance。根据能量守恒，应该有 $E_o \le E_i$，因此
+$$
+\int f(w_i, w_o) cos\theta_i dw_i = \int f(w_i, w_o)cos\theta_o dw_o \le 1
+$$
+其中第一个等式用到了 brdf 的对偶性，即 $f(w_i, w_o) = f(w_o, w_i)$
