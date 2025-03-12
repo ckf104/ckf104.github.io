@@ -63,7 +63,7 @@ $ ./Engine/Build/BatchFiles/RunUBT.bat  UnrealEditor Development Win64 -Mode=Gen
 ```
 "C:\Program Files (x86)\Epic Games\Launcher\Engine\Binaries\Win64\UnrealVersionSelector.exe" /projectfiles "MyProject.uproject"
 ```
-
+* 如果报错 [Clang X64 must be installed in order to build this target](https://forums.unrealengine.com/t/error-clang-must-be-installed-in-order-to-build-this-target/483325)，需要设置环境变量 `LLVM_PATH` 为 LLVM 安装的目录
 ## UE Reflection and GC
 
 ### 关于 Reflection 的整体目标
