@@ -64,7 +64,7 @@ $ ./Engine/Build/BatchFiles/RunUBT.bat  UnrealEditor Development Win64 -Mode=Gen
 "C:\Program Files (x86)\Epic Games\Launcher\Engine\Binaries\Win64\UnrealVersionSelector.exe" /projectfiles "MyProject.uproject"
 ```
 * target 为 UnrealEditor 的 compile_commands.json 不会包含编辑器默认没有启用的插件。如果 project 使用了默认没有启用的插件，那可以把 project 的 compile_commands.json 搬到引擎目录下，可以使用 clangd 的 if blocks 来合成多个 compile_commands.json，见 [Allow specifying more than one compile_commands.json file](https://github.com/clangd/clangd/issues/1092)
-
+* 如果报错 [Clang X64 must be installed in order to build this target](https://forums.unrealengine.com/t/error-clang-must-be-installed-in-order-to-build-this-target/483325)，需要设置环境变量 `LLVM_PATH` 为 LLVM 安装的目录
 ## UE Reflection and GC
 
 ### 关于 Reflection 的整体目标
