@@ -63,6 +63,7 @@ $ ./Engine/Build/BatchFiles/RunUBT.bat  UnrealEditor Development Win64 -Mode=Gen
 ```
 "C:\Program Files (x86)\Epic Games\Launcher\Engine\Binaries\Win64\UnrealVersionSelector.exe" /projectfiles "MyProject.uproject"
 ```
+* target 为 UnrealEditor 的 compile_commands.json 不会包含编辑器默认没有启用的插件。如果 project 使用了默认没有启用的插件，那可以把 project 的 compile_commands.json 搬到引擎目录下，可以使用 clangd 的 if blocks 来合成多个 compile_commands.json，见 [Allow specifying more than one compile_commands.json file](https://github.com/clangd/clangd/issues/1092)
 
 ## UE Reflection and GC
 
@@ -222,26 +223,6 @@ TODO：
   * 看起来在 `SetupAttachment` 中调用了 MARK_PROPERTY_DIRTY_FROM_NAME 宏，涉及ue4.25 加入的 pushmodel，不知道 parent 的 AttachChildren 是不是这样更新的
   * 看起来是在 `USceneComponent::OnRegister` 函数中调用了 `AttachToComponent` 
 * `APown::GetViewRotation` 这个函数啥意思，SpringArm 的 `GetTargetRotation` 用到了它
-
-## Input
-
-这是 [Player-Controlled Cameras](https://dev.epicgames.com/documentation/en-us/unreal-engine/quick-start-guide-to-player-controlled-cameras-in-unreal-engine-cpp) 中的处理输入的示例代码，使用 `UInputComponent` 对应的是已经弃用的基本的处理输入的方法
-
-```c++
-	// Called to bind functionality to input
-	void APawnWithCamera::SetupPlayerInputComponent(class UInputComponent* InputComponent)
-	{
-		Super::SetupPlayerInputComponent(InputComponent);
-		InputComponent->BindAction("ZoomIn", IE_Pressed, this, &APawnWithCamera::ZoomIn);
-		InputComponent->BindAxis("MoveRight", this, &APawnWithCamera::MoveRight);
-	}
-```
-
-* 关于增强输入系统
-  * `UInputMappingContext` 和 `UInputAction` 是什么关系
-  * `UInputTrigger` 是什么，它和 `ETriggerEvent` 是什么关系，为啥在 Editor 里编辑的时候编辑了 Trigger，在BindAction 时又设置了 ETriggerEvent，看这篇讲得很好 [UE5 EnhancedInput InputTrigger](https://zhuanlan.zhihu.com/p/522171880)
-  * 但是在 editor 中设置时，每个 inputAction 可以绑定多个输入然后每个输入有一系列的 trigger 和 modifier，这个和 C++ 中的 InputAction 感觉对不太上？TODO，在 editor 中重新测试一下，
-
 ## Subsystem
 
 * 每个类型的 subsystem 都可以有多个吗？看起来是可以的
