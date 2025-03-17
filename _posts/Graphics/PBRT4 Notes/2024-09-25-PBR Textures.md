@@ -1,3 +1,12 @@
+---
+title: PBR Textures
+date: 2024-09-25 19:44:25 +0800
+categories:
+  - Graphics
+math: true
+comments: true
+---
+
 ### diffuse texture 与 albedo texture 的区别
 我的理解是 diffuse texture 是在非 PBR 渲染中使用的，用来获取漫反射项的系数，例如 bling-phong shading 中的漫反射项为
 $$
