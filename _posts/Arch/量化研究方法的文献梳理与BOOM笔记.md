@@ -63,8 +63,19 @@ Alpha 21264 中也使用了 tournament predictor。它的 local predictor  使�
 #### 2006 A case for (partially) tagged geometric history length branch prediction
 这篇文章提出了 TAGE 预测器。它大概可以理解为级联多个不同历史长度的，并且有 tag 的 gshare 预测器进行预测
 
-具体来讲，TAGE 预测器由一个不带 tag 的 default predictor 和 M 个依赖的历史长度成几何级数的带 tag 的 gshare predictor 组成。default predictor 只使用该 branch 的局部历史进行预测，并且没有 tag，因此提供一个基础的预测结果。如果假设 M 的值 为 8，且几何级数的公比是 2
+具体来讲，TAGE 预测器由一个不带 tag 的 default predictor 和 M 个依赖的历史长度成几何级数的带 tag 的 gshare predictor 组成。default predictor 只使用该 branch 的局部历史进行预测，并且没有 tag，因此提供一个基础的预测结果。如果假设 M 的值 为 5，第一个 gshare 预测器使用的 global history 长度为 2，且几何级数的公比是 2，那么这 8 个 gshare 预测器所依赖的 global history 长度分别是 2，4，8，16，32。tag 是用来减少 branch aliasing，例如我们可以用低位的 pc 和 global history 哈希得到 gshare 预测器的索引，然后用高位的 pc 和 global history 哈希得到一个 tag，取决于使用的 tag 的位数，并不一定能完全消除 branch aliasing。在需要进行预测时，default predictor 和若干个 tag 比对成功的 gshare predictor 提供自己的预测结果，最终的预测结果选择使用最长的 global history 的预测器的结果
 
+每个 gshare predictor 的每个表项除了有一个用于预测的饱和计数器，一个 tag 外，还有一个若干 bits 来表征该表项的 usefulness，简称计数器 u
+
+在预测正确时，我们正常更新 provider 的饱和计数器，然后看 alternative provider 是否预测错误了，如果是，则计数器 u 增加 1。alternative provider 的含义是，如果去掉当前提供最终预测结果的 gshare predictor，那么会被采取预测结果的 predictor 就是 alternative provider。直观上计数器 u 表征了该预测表项是否关键，非它不可
+
+而在预测错误时，也正常更新 provider 的饱和计数器，如果 alternative provider 预测对了，那么将 provider 的计数器 u 减少 1。并且我们在预测错误时还将遍历这些比 provider 使用更长的 global history 的 gshare 预测器，看它们的该 branch 的对应表项中计时器 u 是否小于等于 0，如果有，那么找到了，就将该表项的 tag 更新为该 branch 对应的 tag，饱和计数器设置为 weak correct，计数器 u 设置为 0（表示我们希望使用更长的全局历史进行预测）如果这些表项的计数器 u 都大于等于 1，那么将这些表项的计数器 u 都减少 1。直观上来说，计数器 u 提供了一种伪 LRU 替换，因为 u 大于 0 就表示该表项有正向的贡献
+
+另外还有两点
+* 如果在预测错误分配新表项时有多个 gshare 预测器的对应表项的计数器 u 小于等于 0，分配使用更短 global history 的 gshare 预测器的表项的概率是使用更长 global history  的 gshare 预测器的表项的两倍。不总是使用更短 global history 的表项是为了减少乒乓现象
+* 论文中谈到需要周期性地重制计数器 u，避免一些表项的计数器 u 一直大于 0（例如 alternative provider）
+
+TODO: 为什么只更新 provider 的饱和计数器呢，我觉得也应该更新 alternative provider 的饱和计数器来避免 usefulness 的评价失衡才对r
 #### 1984 Branch Prediction Strategies and Branch Target Buffer Design
 提出了 Branch Target Buffer，使用 pc 地址来寻址 Branch Target Buffer，获取 branch 的目标地址
 
