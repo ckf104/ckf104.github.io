@@ -3,6 +3,12 @@
 唯一需要注意的是，对于 blocking hit，设置物体的 `Simulation Generates Hit Events` 属性为 true 就能产生 hit event，但对于 overlap，需要物体自身和 overlap 物体的 `bGenerateOverlapEvents` 属性同时为 true 才能产生 overlap event
 
 trace channel 主要用于 ray cast，文档 [Traces Overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/traces-in-unreal-engine---overview) 已经做了较好的总结
+### Collision Setup
+simple collision 保存在 `UBodySetup` 中，primitive component 函数提供了一个 `GetBodySetup` 虚函数，子类可以重载
+```c++
+virtual class UBodySetup* GetBodySetup();
+```
+文档 [Setting Up Collisions With Static Meshes](https://dev.epicgames.com/documentation/en-us/unreal-engine/setting-up-collisions-with-static-meshes-in-unreal-engine) 对如何在 static mesh editor 中设置 collision 讲得挺好
 ### API
 scene component 提供的外部接口
 ```c++
@@ -48,4 +54,29 @@ TODO：捋清移动有子节点的 primitive component 时碰撞逻辑，多个 
 * 每个 mesh 的 simple / complex collision 又存储在哪的呢
 TODO：skeletal mesh component 的 `MoveComponentImpl` 实现
 ### Movement Component
-TODO
+scene component 以及它的子类已经实现了关键的 `MoveComponentImpl` 函数。movement component 则负责管理和按照一些规则更新 scene component 的速度和加速度，并根据 scene component 的速度来调用 `MoveComponentImpl` 更新物体的位置。它的 `UpdatedComponent` 字段指定了需要管理的 scene component
+```c++
+	/**
+	 * The component we move and update.
+	 * If this is null at startup and bAutoRegisterUpdatedComponent is true, the owning Actor's root component will automatically be set as our UpdatedComponent at startup.
+	 * @see bAutoRegisterUpdatedComponent, SetUpdatedComponent(), UpdatedPrimitive
+	 */
+	UPROPERTY(BlueprintReadOnly, Transient, DuplicateTransient, Category=MovementComponent)
+	TObjectPtr<USceneComponent> UpdatedComponent;
+
+	/** Current velocity of updated component. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Velocity)
+	FVector Velocity;
+```
+`Velocity` 字段指明了当前的速度
+#### Projectile Movement Component
+通常用于投射物的移动。`InitialSpeed` 指明 spawn 出来后的初速度，速度方向由父类的 `Velocity` 字段控制。然后受到重力影响进行运动
+```c++
+	/** Initial speed of projectile. If greater than zero, this will override the initial Velocity value and instead treat Velocity as a direction. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Projectile)
+	float InitialSpeed;
+```
+
+
+发生碰撞时可以选择反弹或者停止模拟，可以通过一些参数控制反弹的速度
+* 可以
