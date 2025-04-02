@@ -70,13 +70,109 @@ scene component 以及它的子类已经实现了关键的 `MoveComponentImpl` �
 ```
 `Velocity` 字段指明了当前的速度
 #### Projectile Movement Component
-通常用于投射物的移动。`InitialSpeed` 指明 spawn 出来后的初速度，速度方向由父类的 `Velocity` 字段控制。然后受到重力影响进行运动
+通常用于投射物的移动。`InitialSpeed` 指明 spawn 出来后的初速度，速度方向由父类的 `Velocity` 字段控制。然后受到重力影响进行运动。默认没有空气阻力和摩擦等的模拟
 ```c++
 	/** Initial speed of projectile. If greater than zero, this will override the initial Velocity value and instead treat Velocity as a direction. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Projectile)
 	float InitialSpeed;
 ```
+`bShouldBounce` 控制发生碰撞时应该反弹还是停止模拟。`Bounciness` 和 `Friction` 控制反弹时垂直碰撞平面方向的速度和平行平面方向的速度
+```c++
+	/** If true, simple bounces will be simulated. Set this to false to stop simulating on contact. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=ProjectileBounces)
+	uint8 bShouldBounce:1;
 
+	/**
+	 * Percentage of velocity maintained after the bounce in the direction of the normal of impact (coefficient of restitution).
+	 * 1.0 = no velocity lost, 0.0 = no bounce. Ignored if bShouldBounce is false.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=ProjectileBounces, meta=(ClampMin="0", UIMin="0"))
+	float Bounciness;
 
-发生碰撞时可以选择反弹或者停止模拟，可以通过一些参数控制反弹的速度
-* 可以
+	/**
+	 * Coefficient of friction, affecting the resistance to sliding along a surface.
+	 * Normal range is [0,1] : 0.0 = no friction, 1.0+ = very high friction.
+	 * Also affects the percentage of velocity maintained after the bounce in the direction tangent to the normal of impact.
+	 * Ignored if bShouldBounce is false.
+	 * @see bBounceAngleAffectsFriction
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=ProjectileBounces, meta=(ClampMin="0", UIMin="0"))
+	float Friction;
+```
+可以通过设置 `bIsHomingProjectile` 为 true 使得 projectile 跟踪目标
+```c++
+	/**
+	 * If true, we will accelerate toward our homing target. HomingTargetComponent must be set after the projectile is spawned.
+	 * @see HomingTargetComponent, HomingAccelerationMagnitude
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Homing)
+	uint8 bIsHomingProjectile:1;
+
+	/**
+	 * The current target we are homing towards. Can only be set at runtime (when projectile is spawned or updating).
+	 * @see bIsHomingProjectile
+	 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category=Homing)
+	TWeakObjectPtr<USceneComponent> HomingTargetComponent;
+```
+#### Character Movement Component
+##### Jump
+character movement component 的 jump 逻辑受 character 的 `JumpKeyHoldTime` 和 `JumpMaxCount` 字段影响。`JumpKeyHoldTime` 是指一次 jump 的持续时间的最大值。所谓持续时间，就是在这段时间里会维持 jump 的初速度，不会受重力影响而减小。而 `JumpMaxCount` 指定可以在空中连续跳多少次
+```c++
+	/** 
+	 * Jump key Held Time.
+	 * This is the time that the player has held the jump key, in seconds.
+	 */
+	UPROPERTY(Transient, BlueprintReadOnly, VisibleInstanceOnly, Category=Character)
+	float JumpKeyHoldTime;
+
+    /**
+     * The max number of jumps the character can perform.
+     * Note that if JumpMaxHoldTime is non zero and StopJumping is not called, the player
+     * may be able to perform and unlimited number of jumps. Therefore it is usually
+     * best to call StopJumping() when jump input has ceased (such as a button up event).
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category=Character)
+    int32 JumpMaxCount;
+```
+以第三人称模板中 jump 的实现为例。每次按下空格键，就会调用 `ACharacter::Jump` 函数，它会将 `bPressedJump` 设置为 true
+```c++
+	/** When true, player wants to jump */
+	UPROPERTY(BlueprintReadOnly, Category=Character)
+	uint32 bPressedJump:1;
+```
+然后在 character movement component 进行 tick 时，检测到 `bPressedJump` 为 true，如果此时 `bWasJumping` 为 false，表明要触发新的跳跃，那么 `JumpCurrentCount` 加 1
+```c++
+	/** Tracks whether or not the character was already jumping last frame. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category=Character)
+	uint32 bWasJumping : 1;
+
+    /**
+     * Tracks the current number of jumps performed.
+     * This is incremented in CheckJumpInput, used in CanJump_Implementation, and reset in OnMovementModeChanged.
+     * When providing overrides for these methods, it's recommended to either manually
+     * increment / reset this value, or call the Super:: method.
+     */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category=Character)
+    int32 JumpCurrentCount;
+```
+无论是触发新的跳跃了并且跳跃次数小于 `JumpMaxCount` 或者是 `bWasJumping` 为 true 但距离上一次触发新跳跃的时间还在 `JumpKeyHoldTime` 之内，都会执行 `UCharacterMovementComponent::DoJump` 函数，这个函数将 character 的 z 方向速度设置为 `JumpZVelocity`，并且将 movement mode 切换为 Falling
+```c++
+	/** Initial velocity (instantaneous vertical acceleration) when jumping. */
+	UPROPERTY(Category="Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, meta=(DisplayName="Jump Z Velocity", ClampMin="0", UIMin="0", ForceUnits="cm/s"))
+	float JumpZVelocity;
+
+	/**
+	 * Actor's current movement mode (walking, falling, etc).
+	 *    - walking:  Walking on a surface, under the effects of friction, and able to "step up" barriers. Vertical velocity is zero.
+	 *    - falling:  Falling under the effects of gravity, after jumping or walking off the edge of a surface.
+	 *    - flying:   Flying, ignoring the effects of gravity.
+	 *    - swimming: Swimming through a fluid volume, under the effects of gravity and buoyancy.
+	 *    - custom:   User-defined custom movement mode, including many possible sub-modes.
+	 * This is automatically replicated through the Character owner and for client-server movement functions.
+	 * @see SetMovementMode(), CustomMovementMode
+	 */
+	UPROPERTY(Category="Character Movement: MovementMode", BlueprintReadOnly)
+	TEnumAsByte<enum EMovementMode> MovementMode;
+```
+一旦
