@@ -116,6 +116,9 @@ scene component 以及它的子类已经实现了关键的 `MoveComponentImpl` �
 	TWeakObjectPtr<USceneComponent> HomingTargetComponent;
 ```
 #### Character Movement Component
+参考了
+* [Exploring in UE4：移动组件详解](https://zhuanlan.zhihu.com/p/34257208)
+* [UE4的移动碰撞](https://zhuanlan.zhihu.com/p/33529865)：它里面获取碰撞以及 resolve penetration 的讨论再看看。TODO：他认为 `UPrimitiveComponent::MoveComponentImpl` 是优先选取非 start penetration 的 hit result？
 ##### Jump
 character movement component 的 jump 逻辑受 character 的 `JumpKeyHoldTime` 和 `JumpMaxCount` 字段影响。`JumpKeyHoldTime` 是指一次 jump 的持续时间的最大值。所谓持续时间，就是在这段时间里会维持 jump 的初速度，不会受重力影响而减小。而 `JumpMaxCount` 指定可以在空中连续跳多少次
 ```c++
@@ -175,4 +178,69 @@ character movement component 的 jump 逻辑受 character 的 `JumpKeyHoldTime` 
 	UPROPERTY(Category="Character Movement: MovementMode", BlueprintReadOnly)
 	TEnumAsByte<enum EMovementMode> MovementMode;
 ```
-一旦
+一旦到达 `JumpKeyHoldTime` 或者用户松开空格键触发 `ACharacter::StopJumping` 回调或者落地结束 Falling 状态时，都会调用 `ACharacter::ResetJumpState`，重置 jump 的状态（不过仅有落地时会重置 `JumpCurrentCount`）
+##### Walking
+TODO：学了物理之后再来看看 `UMovementComponent::ResolvePenetrationImpl` 怎么处理的
+TODO：看看 `UCharacterMovementComponent::UpdateBasedMovement` 是怎么处理移动平台的，感觉与 `bImpartBaseVelocityX` 有些关系
+TODO：看看 ``UCharacterMovementComponent` 中是怎么处理 Root Motion 的
+TODO：一些尝试的实现：恒定速度，世界翻转，平台移动，斜坡上下滑
+
+首先是 walking 的速度控制，`UCharacterMovementComponent::CalcVelocity` 中会更新 character 速度，主要有三个方面
+* 当玩家按键指示移动方向时，我们调用 `AddMovementInput` 将这个移动方向更新到 `ControlInputVector` 中，它作为一个长度为 0 到 1 之间的向量会乘以 `MaxAcceleration`，作为这一帧的加速度，然后乘以 delta 时间更新到速度上
+* `GroundFriction` 字段控制一个与速度成正比的摩擦力的大小
+* `BrakingDecelerationWalking` 字段控制当加速度为 0（即玩家停止输入时）额外的减速大小
+```c++
+	/**
+	 * Setting that affects movement control. Higher values allow faster changes in direction.
+	 * If bUseSeparateBrakingFriction is false, also affects the ability to stop more quickly when braking (whenever Acceleration is zero), where it is multiplied by BrakingFrictionFactor.
+	 * When braking, this property allows you to control how much friction is applied when moving across the ground, applying an opposing force that scales with current velocity.
+	 * This can be used to simulate slippery surfaces such as ice or oil by changing the value (possibly based on the material pawn is standing on).
+	 * @see BrakingDecelerationWalking, BrakingFriction, bUseSeparateBrakingFriction, BrakingFrictionFactor
+	 */
+	UPROPERTY(Category="Character Movement: Walking", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
+	float GroundFriction;
+
+	/**
+	 * Deceleration when walking and not applying acceleration. This is a constant opposing force that directly lowers velocity by a constant value.
+	 * @see GroundFriction, MaxAcceleration
+	 */
+	UPROPERTY(Category="Character Movement: Walking", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
+	float BrakingDecelerationWalking;
+
+	/** Max Acceleration (rate of change of velocity) */
+	UPROPERTY(Category="Character Movement (General Settings)", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
+	float MaxAcceleration;
+```
+具体如何进行移动在 [UE4的移动碰撞](https://zhuanlan.zhihu.com/p/33529865) 中已经讲得很清楚了。我额外再补充一些 character movement component 中与移动行为有关的字段
+```c++
+	/**
+	 * Max angle in degrees of a walkable surface. Any greater than this and it is too steep to be walkable.
+	 */
+	UPROPERTY(Category="Character Movement: Walking", EditAnywhere, meta=(ClampMin="0.0", ClampMax="90.0", UIMin = "0.0", UIMax = "90.0", ForceUnits="degrees"))
+	float WalkableFloorAngle;
+
+	/** If true, Character can walk off a ledge. */
+	UPROPERTY(Category="Character Movement: Walking", EditAnywhere, BlueprintReadWrite)
+	uint8 bCanWalkOffLedges:1;
+
+	/**
+	 * Don't allow the character to perch on the edge of a surface if the contact is this close to the edge of the capsule.
+	 * Note that characters will not fall off if they are within MaxStepHeight of a walkable surface below.
+	 */
+	UPROPERTY(Category="Character Movement: Walking", EditAnywhere, BlueprintReadWrite, AdvancedDisplay, meta=(ClampMin="0", UIMin="0", ForceUnits=cm))
+	float PerchRadiusThreshold;
+	/**
+	 * When perching on a ledge, add this additional distance to MaxStepHeight when determining how high above a walkable floor we can perch.
+	 * Note that we still enforce MaxStepHeight to start the step up; this just allows the character to hang off the edge or step slightly higher off the floor.
+	 * (@see PerchRadiusThreshold)
+	 */
+	UPROPERTY(Category="Character Movement: Walking", EditAnywhere, BlueprintReadWrite, AdvancedDisplay, meta=(ClampMin="0", UIMin="0", ForceUnits=cm))
+	float PerchAdditionalHeight;
+```
+`WalkableFloorAngle` 用于设置最大能走上的斜面坡度。`IsWalkable` 函数用它来判断该 floor 是否 walkable。`bCanWalkOffLedges` 用于指示 character 能否走下悬崖，当移动使得 floor 切换到 unwalkable 状态时，会调用 `CanWalkOffLedges` 函数来判断这个移动是否合法。`PerchRadiusThreshold` 和 `PerchAdditionalHeight` 限制栖息条件。下面两个条件同时满足时我们认为当前的 floor 不再 walkable 了（需要进入 falling 状态）
+* 胶囊体向下 sweep 时碰撞点到胶囊体外侧的距离小于 `PerchRadiusThreshold`，这说明我们当前处于 floor 的边上
+* 一个半径为角色胶囊体半径减去 `PerchRadiusThreshold` 的小胶囊体向下 sweep 时没有找到 walkable floor，`PerchAdditionalHeight` 参数提供了 sweep 的额外距离的控制。这说明我们睬的 floor 前面没有 floor 了（排除台阶这种情况）
+
+floor 切换后，`AdjustFloorHeight` 函数会对胶囊体的高度进行调整，使其到 floor 在重力方向上的距离在 `MIN_FLOOR_DIST` 和 `MAX_FLOOR_DIST` 之间。不紧贴 floor 使得下次移动时不会马上就发生碰撞
+
+然后我们讨论对 Movement Base 的处理，Movement Base 通常是当前的 floor，但如果 `ACharacter::SetBase` 中
