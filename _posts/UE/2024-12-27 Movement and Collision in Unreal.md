@@ -243,4 +243,23 @@ TODO：一些尝试的实现：恒定速度，世界翻转，平台移动，斜�
 
 floor 切换后，`AdjustFloorHeight` 函数会对胶囊体的高度进行调整，使其到 floor 在重力方向上的距离在 `MIN_FLOOR_DIST` 和 `MAX_FLOOR_DIST` 之间。不紧贴 floor 使得下次移动时不会马上就发生碰撞
 
-然后我们讨论对 Movement Base 的处理，Movement Base 通常是当前的 floor，但如果 `ACharacter::SetBase` 中
+然后我们讨论对 movement base 的处理，floor 切换时会调用 `SetBase` 并进一步调用 `SaveBaseLocation`（另外，`SetBase` 还会将 movement base 的 tick 函数设置为自己的依赖，这样保证 movement base 的 tick 函数总是在自己之前执行）以及在每帧 tick 调用的 `PerformMovement` 也会调用 `SaveBaseLocation`。`SaveBaseLocation` 中会将 movement base 的 location 和 rotation 设置到自己的 `OldBaseLocation` 和 `OldBaseQuat` 字段中
+```c++
+	/** Saved location of object we are standing on, for UpdateBasedMovement() to determine if base moved in the last frame, and therefore pawn needs an update. */
+	FQuat OldBaseQuat;
+
+	/** Saved location of object we are standing on, for UpdateBasedMovement() to determine if base moved in the last frame, and therefore pawn needs an update. */
+	FVector OldBaseLocation;
+```
+
+
+。Movement Base 通常是当前的 floor，但如果 `bStayBasedInAir` 为 true，那么在空中也不会 clear base。`ACharacter::SetBase` 中
+```c++
+	/** Property to set if characters should stay based on objects while jumping */
+	UPROPERTY(Category = "Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite)
+	bool bStayBasedInAir = false;
+
+	/** Property used to set how high above base characters should stay based on objects while jumping if bStayBasedInAir is set */
+	UPROPERTY(Category = "Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, meta = (editcondition = "bStayBasedInAir"))
+	float StayBasedInAirHeight = 1000.0f;
+```
