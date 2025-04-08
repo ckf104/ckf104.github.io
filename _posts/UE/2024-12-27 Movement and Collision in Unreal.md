@@ -242,7 +242,7 @@ TODO：一些尝试的实现：恒定速度，世界翻转，平台移动，斜�
 * 一个半径为角色胶囊体半径减去 `PerchRadiusThreshold` 的小胶囊体向下 sweep 时没有找到 walkable floor，`PerchAdditionalHeight` 参数提供了 sweep 的额外距离的控制。这说明我们睬的 floor 前面没有 floor 了（排除台阶这种情况）
 
 floor 切换后，`AdjustFloorHeight` 函数会对胶囊体的高度进行调整，使其到 floor 在重力方向上的距离在 `MIN_FLOOR_DIST` 和 `MAX_FLOOR_DIST` 之间。不紧贴 floor 使得下次移动时不会马上就发生碰撞
-
+##### Movment Base
 然后我们讨论对 movement base 的处理，floor 切换时会调用 `SetBase` 并进一步调用 `SaveBaseLocation`（另外，`SetBase` 还会将 movement base 的 tick 函数设置为自己的依赖，这样保证 movement base 的 tick 函数总是在自己之前执行）以及在每帧 tick 调用的 `PerformMovement` 也会调用 `SaveBaseLocation`。`SaveBaseLocation` 中会将 movement base 的 location 和 rotation 设置到自己的 `OldBaseLocation` 和 `OldBaseQuat` 字段中
 ```c++
 	/** Saved location of object we are standing on, for UpdateBasedMovement() to determine if base moved in the last frame, and therefore pawn needs an update. */
@@ -251,9 +251,9 @@ floor 切换后，`AdjustFloorHeight` 函数会对胶囊体的高度进行调整
 	/** Saved location of object we are standing on, for UpdateBasedMovement() to determine if base moved in the last frame, and therefore pawn needs an update. */
 	FVector OldBaseLocation;
 ```
+在每帧调用的 `PerformMovement` 中会调用 `MaybeUpdateBasedMovement`，该函数根据新的 movement base 的新 location 和 rotation，结合之前保存的 `OldBaseQuat` 和 `OldBaseLocation`，就能对 character 的 location 和 rotation 进行更新，保持它们的相对位置和旋转不变
 
-
-。Movement Base 通常是当前的 floor，但如果 `bStayBasedInAir` 为 true，那么在空中也不会 clear base。`ACharacter::SetBase` 中
+movement base 通常是当前的 floor。但如果 `bStayBasedInAir` 为 true，那么在空中也不会 clear base（这样在移动平台上原地跳的时候不至于落下去）。此时处于 falling 状态时会额外进行地板检测，向下 sweep 的距离由 `StayBasedInAirHeight` 指定，一旦检测到的 floor 和 movement base 不同，就将 movement base 置空
 ```c++
 	/** Property to set if characters should stay based on objects while jumping */
 	UPROPERTY(Category = "Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite)
@@ -263,3 +263,32 @@ floor 切换后，`AdjustFloorHeight` 函数会对胶囊体的高度进行调整
 	UPROPERTY(Category = "Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, meta = (editcondition = "bStayBasedInAir"))
 	float StayBasedInAirHeight = 1000.0f;
 ```
+当离开 movement base 时，会调用 `ApplyImpartedMovementBaseVelocity` 将 movement base 的速度和角速度加到 character 上
+##### Falling
+character 在空中时玩家的移动控制能力由 `AirControl` 指定，`AirControl` 越小，玩家对 character 的控制越弱
+```c++
+	/**
+	 * When falling, amount of lateral movement control available to the character.
+	 * 0 = no control, 1 = full control at max speed of MaxWalkSpeed.
+	 */
+	UPROPERTY(Category="Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
+	float AirControl;
+```
+水平速度的更新同样使用 `CalcVelocity` 函数，不过现在摩擦系数和刹车速度由 `FallingLateralFriction` 和 `BrakingDecelerationFalling` 指定
+```c++
+	/**
+	 * Friction to apply to lateral air movement when falling.
+	 * If bUseSeparateBrakingFriction is false, also affects the ability to stop more quickly when braking (whenever Acceleration is zero).
+	 * @see BrakingFriction, bUseSeparateBrakingFriction
+	 */
+	UPROPERTY(Category="Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
+	float FallingLateralFriction;
+	
+	/**
+	 * Lateral deceleration when falling and not applying acceleration.
+	 * @see MaxAcceleration
+	 */
+	UPROPERTY(Category="Character Movement: Jumping / Falling", EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", UIMin="0"))
+	float BrakingDecelerationFalling;
+```
+与 walking 状态不同，falling 状态会调用 `NewFallVelocity` 将重力加速度也考虑进来。其它部分就和 walking 差不多了，根据速度进行移动，然后如果碰撞了，要么找到 floor 切换到 walking 状态，要么像 walking 那样根据碰撞的法线调整移动方向
