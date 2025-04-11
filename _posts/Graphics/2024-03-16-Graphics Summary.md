@@ -32,6 +32,35 @@ categories: [Graphics]
 * 除了手系外，深度映射的范围（0 到 1 还是 -1 到 1，是否需要 reverse Z）也会影响投影变换的形式
 * OpenGL 等图形学 API 本身是没有手系这个概念的，但约定了屏幕坐标系中原点在屏幕左下方
 * 右手系摄像机看向 z 轴负方向，而左手系摄像机看向 z 轴正方向。这个约定我觉得是为了匹配屏幕坐标系中原点在屏幕左下方这个约定。如果不这样做，例如右手系下摄像机看向 z 轴正方向，就会感觉渲染出来的结果和三维空间想象的结果左右或者上下翻折了
+### Quaternions
+[四元数与三维旋转](https://krasjet.github.io/quaternion/quaternion.pdf) 已经讲得足够好了，我这里做一些额外的补充
+
+一个是 slerp 插值，现在有四元数 $q_1$，$q_2$。[四元数与三维旋转](https://krasjet.github.io/quaternion/quaternion.pdf)  提到朴素的插值方法是
+$$
+q(t) = (q_2q_1^{-1})^t q_1
+$$
+显然这个插值方法是恒定角速度的（设想一个刚体原本是 $q_1$ 朝向，希望旋转到 $q_2$ 朝向，那么 $q_2 q_1^{-1}$ 实际上给出了刚体的旋转轴 $\mathbf{u}$ 和旋转角度 $\theta$，$(q_2q_1^{-1})^t$ 就是将刚体绕着轴 $\mathbf{u}$ 旋转 $t\theta$
+
+文中使用 [Geometric slerp](https://en.wikipedia.org/wiki/Slerp) 作为四元数的 slerp 插值。推导出的结果为
+$$
+q(t) = \frac{sin[(1-t)\theta]}{sin\theta}q_1 + \frac{sin[t\theta]}{sin\theta}q_2
+$$
+从推导过程可以看出，插值过程中 $q(t)$ 与 $q_2$ 的夹角减小速度保持恒定，但是不太能明显看出插值过程中的旋转轴保持恒定。现在我们说明这个朴素的插值方法就是 slerp 方法，因此 slerp 方法确实保持插值过程中角速度恒定
+
+记 $q_2q_1^{-1} = [cos\theta, \mathbf{u}sin\theta]$，我们有
+$$
+\displaylines{
+\begin{align*}
+q(t) &= \frac{sin[(1-t)\theta]}{sin\theta}q_1 + \frac{sin[t\theta]}{sin\theta}q_2 \\
+&= (\frac{sin[(1-t)\theta]}{sin\theta} + \frac{sin[t\theta]}{sin\theta}[cos\theta, \mathbf{u}sin\theta])q_1 \\
+&= [cos[t\theta], \mathbf{u}sin[t\theta]]q_1 \\
+&= (q_2q_1^{-1})^t q_1
+\end{align*}
+}
+$$
+因此这两个插值方法是一致的
+
+另外一个是四元数的指数表示，记 $q = [cos\theta, \mathbf{u}sin\theta]$，有 $e^{\mathbf{u}\theta} = cos\theta + \mathbf{u}sin\theta$，但这并不意味着说指数表示也满足乘法，即 $e^{\mathbf{u_1}\theta_1 + \mathbf{u_2}\theta_2} \neq q_1*q_2$，要说明这一点也很简单，因为指数乘法是满足交换律的，但四元数的乘法是不可交换的
 ### Pinhole Camera Model
 
 真实的 pinhole camera model，内参矩阵：fx, fy, cx, cy，见 [Why does the focal length in the camera intrinsics matrix have two dimensions?](https://stackoverflow.com/questions/16329867/why-does-the-focal-length-in-the-camera-intrinsics-matrix-have-two-dimensions) 的讨论，高赞回答引用的 learn opencv 一书中的描述解释得很到位
@@ -148,6 +177,10 @@ TODO
   \int_{w_o} f(p,w_i,w_o) cos\theta_o dw_o \le 1
   $$
   它的推导是认为输出的能量大小是 $L_o(p,w_o)*cos\theta_o$，那与平面平行的那部分 radiance 从哪来的，从输入的与平面平行的 radiance 中来的吗，那为什么没有体现出这部分约束呢？
+#### 各向同性 brdf
+对于各项同性的 brdf，它的表达式可写为 $f(w_i,w_o) = f(\theta_i,\theta_o,\phi_i - \phi_o)$，其中 $\theta$ 是天顶角，$\phi$ 是方位角。对各项同性的 brdf 的直观理解是，如果用某一光源照射有着各项同性的 brdf 的小纸片，然后从某一固定视角接收到反射的光线。现在沿着法线方向将小纸片旋转任意角度，视角方向接收到的光照不变。另外一种理解是，如果给予各项同性的光照 $L_i(\theta_i)$，那么反射的光线 $L_o(\theta_o) = \int f(\theta_i,\theta_o,\phi_i - \phi_o)sin\theta_i d\theta_i d\phi_i$ 也是各项同性的（显然 $\phi_o$ 的取值不影响结果）
+
+一个典型的例子是 GGX microfacet brdf，如果我们使用各向同性的 GGX 分布，那么法线分布 $D(h)$ 和自遮挡项 $G(h,l,v)$ 可以分别写为 $D(h \cdot n)$ 和 $G(l \cdot h, v \cdot h)$，这里 $h$ 是 视线方向 $v$ 和光照方向 $l$ 的半程向量。可以看出，当我们绕着法线方向对 $l$ 和 $v$ 同时旋转任意角度，$h \cdot n, l \cdot h, v \cdot h$ 的值都是不会改变的，因此 $D$ 和 $G$ 的值不变，进而可以推出 brdf 的值不变。因此各向同性的 GGX 分布会对应各向同性的 brdf
 ### Path Tracing
 
 为了求解渲染方程，首先是用蒙特卡洛方法估计积分，取一个分布在 $[a,b] 上的$随机变量 $X$ 和它的概率密度函数 $pdf(X)$，那么我们为求 $\int_a^b{f(x)}$ ，我们有
@@ -168,9 +201,6 @@ TODO：补充俄罗斯轮盘赌
 TODO：在计算直接光照时，实际选择的 pdf 是面向光源采样的
 
 TODO：实际得到的计算结果不是颜色，而是 radiance，如何转换为颜色？-> color space and gamma correction
-
-TODO：games202 中把 brdf 写成了考虑 visibility 的形式，没太理解
-
 ## Shadow Mapping
 
 参见 learn opengl 中的介绍
