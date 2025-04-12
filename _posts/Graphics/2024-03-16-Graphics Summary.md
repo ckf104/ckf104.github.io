@@ -60,7 +60,7 @@ q(t) &= \frac{sin[(1-t)\theta]}{sin\theta}q_1 + \frac{sin[t\theta]}{sin\theta}q_
 $$
 因此这两个插值方法是一致的
 
-另外一个是四元数的指数表示，记 $q = [cos\theta, \mathbf{u}sin\theta]$，有 $e^{\mathbf{u}\theta} = cos\theta + \mathbf{u}sin\theta$，但这并不意味着说指数表示也满足乘法，即 $e^{\mathbf{u_1}\theta_1 + \mathbf{u_2}\theta_2} \neq q_1*q_2$，要说明这一点也很简单，因为指数乘法是满足交换律的，但四元数的乘法是不可交换的
+另外一个是四元数的指数表示，记 $q = [cos\theta, \mathbf{u}sin\theta]$，[Quaternions, Interpolation and Animation](http://web.mit.edu/2.998/www/QuaternionReport1.pdf) 中定义了 $log\,q=[0,\mathbf{u}\theta]$  $e^{log\,q} = q$，但这并不意味着说指数表示也满足乘法（除非旋转轴相同），即 $e^{\mathbf{u_1}\theta_1 + \mathbf{u_2}\theta_2} \neq q_1*q_2$，要说明这一点也很简单，因为指数乘法是满足交换律的，但四元数的乘法是不可交换的
 ### Pinhole Camera Model
 
 真实的 pinhole camera model，内参矩阵：fx, fy, cx, cy，见 [Why does the focal length in the camera intrinsics matrix have two dimensions?](https://stackoverflow.com/questions/16329867/why-does-the-focal-length-in-the-camera-intrinsics-matrix-have-two-dimensions) 的讨论，高赞回答引用的 learn opencv 一书中的描述解释得很到位
