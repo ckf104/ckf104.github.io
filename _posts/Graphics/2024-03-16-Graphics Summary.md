@@ -60,7 +60,12 @@ q(t) &= \frac{sin[(1-t)\theta]}{sin\theta}q_1 + \frac{sin[t\theta]}{sin\theta}q_
 $$
 因此这两个插值方法是一致的
 
-另外一个是四元数的指数表示，记 $q = [cos\theta, \mathbf{u}sin\theta]$，有 $e^{\mathbf{u}\theta} = cos\theta + \mathbf{u}sin\theta$，但这并不意味着说指数表示也满足乘法，即 $e^{\mathbf{u_1}\theta_1 + \mathbf{u_2}\theta_2} \neq q_1*q_2$，要说明这一点也很简单，因为指数乘法是满足交换律的，但四元数的乘法是不可交换的
+另外一个是四元数的指数表示，记 $q = [cos\theta, \mathbf{u}sin\theta]$，[Quaternions, Interpolation and Animation](https://web.mit.edu/2.998/www/QuaternionReport1.pdf) 中定义了 $log\,q=[0,\mathbf{u}\theta]$  $e^{log\,q} = q$，但这并不意味着说指数表示也满足乘法（除非旋转轴相同），即 $e^{\mathbf{u_1}\theta_1 + \mathbf{u_2}\theta_2} \neq q_1*q_2$，要说明这一点也很简单，因为指数乘法是满足交换律的，但四元数的乘法是不可交换的
+
+在 [Quaternions, Interpolation and Animation](https://web.mit.edu/2.998/www/QuaternionReport1.pdf) 的 proposition 29 证明了 slerp 总是沿着较短的圆弧插值过去的（即旋转夹角小于等于 180 度），对应的三维空间旋转角度小于等于 360 度。但由于 -q 和 q 表示相同的旋转，因此我们总是可以使得需要插值的两个四元数的夹角小于等于 90 度，这样得到的三维空间的旋转角度小于等于 180 度
+
+TODO：解释四元数的导数和角速度定义
+TODO：解释 squad 插值
 ### Pinhole Camera Model
 
 真实的 pinhole camera model，内参矩阵：fx, fy, cx, cy，见 [Why does the focal length in the camera intrinsics matrix have two dimensions?](https://stackoverflow.com/questions/16329867/why-does-the-focal-length-in-the-camera-intrinsics-matrix-have-two-dimensions) 的讨论，高赞回答引用的 learn opencv 一书中的描述解释得很到位
