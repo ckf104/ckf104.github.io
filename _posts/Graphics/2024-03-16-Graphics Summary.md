@@ -122,7 +122,7 @@ TODO
   * bump mapping 中的高度位移是 normal mapping 的更原始形式。即当我希望制造一些凹凸感时，在 3D 软件中创造 bump mapping 更加直观，然后我们用 bump mapping 中的高度偏移，计算出实际法线方向，存储在 normal mapping 中
 
   * displacement mapping 相比于 bump mapping，会实际移动像素点在世界坐标中的位置
-  * [视差贴图](https://learnopengl-cn.github.io/05%20Advanced%20Lighting/05%20Parallax%20Mapping/) 的想法是根据视线方向来移动 fragment point 的纹理坐标，移动的距离和深度贴图正相关，这使得产生了深度感和遮蔽效果。举一个例子：四块平面 A B C D 从左到右依次排开，但在深度贴图上看，A 和 D 是平面，B 是一个左高右低的斜坡，C 是左低右高的斜坡，D 是平面，当视线从右上方观测时，A 位置不变，渲染 B 时纹理坐标会向 A 那边靠，渲染 C 时纹理坐标向 B 那边靠，渲染 D 时位置不变，因此看上去 A 稍微变宽了一些，C 则几乎看不见了，像是被挡住了一样，这从视觉上就形成了深度效果。TODO：解释 Steep Parallax Mapping 和 Parallax Occlusion Mapping
+  * [视差贴图](https://learnopengl-cn.github.io/05%20Advanced%20Lighting/05%20Parallax%20Mapping/) 的想法是根据视线方向来移动 fragment point 的纹理坐标，移动的距离和深度贴图正相关，这使得产生了深度感和遮蔽效果。举一个例子：四块平面 A B C D 从左到右依次排开，但在深度贴图上看，A 和 D 是平面，B 是一个左高右低的斜坡，C 是左低右高的斜坡，D 是平面，当视线从右上方观测时，A 位置不变，渲染 B 时纹理坐标会向 A 那边靠，渲染 C 时纹理坐标向 B 那边靠，渲染 D 时位置不变，因此看上去 A 稍微变宽了一些，C 则几乎看不见了，像是被挡住了一样，这从视觉上就形成了深度效果。纹理坐标的偏移量取 $height * xy / z$ 是假设周围点的深度值不变，因此根据相似三角形计算出交点的偏移量。Steep Parallax Mapping 引入一个额外的步进参数 layer，每次步进的纹理偏移使得深度增加 $1 / layer$，找到第一个使得步进后深度大于深度纹理中的深度值的位置作为着色时的纹理坐标。Parallax Occlusion Mapping 相对于 Steep Parallax Mapping 的改进就是在找交点纹理坐标时做了一个线性插值，而不是直接使用第一个使得步进后深度大于深度纹理中的深度值的位置
 
   * [cg tutorial](https://developer.download.nvidia.cn/CgTutorial/cg_tutorial_chapter08.html) 是上面这部分内容的重要参考
 
