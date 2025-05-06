@@ -341,7 +341,7 @@ class FConstructor {
 };
 ```
 
-该 GraphTask 不能先于它的 EventsToWaitFor 字段中包含的 GraphEvent 完成。在 UE 实际的实现中，当该 FGraphEvent 完成后，UE 会启动一个 NullTask，这个 NullTask 复用该 GraphTask 的 GraphEvent，并且将  EventsToWaitFor 字段作为它的 Preqs
+该 GraphTask 不能先于它的 EventsToWaitFor 字段中包含的 GraphEvent 完成。在 UE 实际的实现中，当该 FGraphEvent 完成后，UE 会启动一个 NullTask，这个 NullTask 复用该 GraphTask 的 GraphEvent（因此直到该 NullTask 执行完成这个 GraphTask 的 GraphEvent 的 `IsComplete` 才会返回 true，即使此时该 GraphTask 可能已经被析构了），并且将  EventsToWaitFor 字段作为它的 Preqs
 
 每一个 Task 执行完毕后，如果 EventsToWaitFor 字段为空，会检查它的 SubsequentList，将这里面的 Task 的 NumberOfPrerequistitesOutstanding 值减一，减到 0 之后就会调用 FTaskGraphInterface::QueueTask 将 Task 压入调度队列中
 
@@ -356,7 +356,7 @@ bool FNamedTaskThread::EnqueueFromOtherThread(int32 QueueIndex, FBaseGraphTask* 
 
 TODO：NamedThread 中 Local Queue 和 Main Queue 有什么区别，例如 Render Thread 的主函数就是一直处理 MainQueue 上的 Task，那压入 Local Queue 的 Task 怎么办呢？[UE4之TaskGraph系统](https://www.cnblogs.com/kekec/p/13915313.html) 中提到了这俩 queue 的区别
 
-
+`TGraphTask::Subsequents` 可以理解为对 graph task 的一个句柄，用户可以使用 `FGraphEvent` 提供的接口来检查是否该 graph task 已完成（`FGraphEvent::IsComplete`），或者等待它完成（`FGraphEvent::Wait`），甚至可以在 task 执行过程中添加新的依赖（`FGraphEvent::DontCompleteUntil`），这些临时添加的依赖记录在 EventsToWaitFor 字段中
 
 FReturnGraphTask
 
