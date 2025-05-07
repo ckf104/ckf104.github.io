@@ -35,21 +35,11 @@ Rigid Body Controller：Tries to drive the rigid bodies of the ragdoll to the de
 `FBodyInstance` 中包含 `InstanceBodyIndex` 和 `InstanceBoneIndex`，后者是这个 body instance 对应的 bone 在 skeleton 中的 bone 编号，而前者是 skeletal mesh 的 physics asset 中的 body 编号，用来索引 skeletal mesh component 的 `Bodies` 字段
 
 TODO：不太理解的地方是，如果一部分的 bone 是 simulating physics 的，另一部分是 kinematic 的，kinematic 的 bone 在连接处会给 physics 的 bone 怎样的力？这个力又是如何计算的？（我看 content example 中 physical animation level 中的表现挺像那么回事的，就是 kinematic bone 在运动时会给 physics bone 施加力）
-### Tick in Skeletal Mesh Component
- skeletal mesh component 有三个 tick function，除了在 `TG_PrePhysics` 中运行的 `PrimaryComponentTick`，还有在 `TG_EndPhysics` 中运行的 `EndPhysicsTickFunction`（在 `USkeletalMeshComponent::RegisterEndPhysicsTick` 中，设置它依赖于 world 的 `EndPhysicsTickFunction`，保证在 world 的 end physcis tick 之后执行）以及在 `TG_PrePhysics` 中运行的 `ClothTickFunction`
 
+TODO：解释 [Using Kinematic Bodies with Simulated Parents](https://dev.epicgames.com/documentation/en-us/unreal-engine/using-kinematic-bodies-with-simulated-parents-in-unreal-engine)，涉及到的选项有
+* body instance 的 `bUpdateKinematicFromSimulation`
+* body setup core 的 `PhysicsType`  
+* skeletal mesh component 的 `PhysicsTransformUpdateMode`
+* skeletal mesh component 的 `bUpdateMeshWhenKinematic`
 
-在 skeletal mesh component 中一些并行的地方
-```c++
-	// Reference to our current parallel animation evaluation task (if there is one)
-	FGraphEventRef				ParallelAnimationEvaluationTask;
-
-	// Reference to our current blend physics task (if there is one)
-	FGraphEventRef				ParallelBlendPhysicsCompletionTask;
-```
-
-`USkeletalMeshComponent::FinalizeAnimationUpdate`
---> `USkeletalMeshComponent::FinalizeBoneTransform`（swap double buffer）
-
-
-`USkeletalMeshComponent::EndPhysicsTickComponent` 这个 tick 的执行情况？梳理一下它到底 tick 的流程是怎样的
+TODO：render 的 pose 是怎么同步给物理模拟的？
