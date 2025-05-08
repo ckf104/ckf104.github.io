@@ -3,6 +3,8 @@
 唯一需要注意的是，对于 blocking hit，设置物体的 `Simulation Generates Hit Events` 属性为 true 就能产生 hit event，但对于 overlap，需要物体自身和 overlap 物体的 `bGenerateOverlapEvents` 属性同时为 true 才能产生 overlap event
 
 trace channel 主要用于 ray cast，文档 [Traces Overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/traces-in-unreal-engine---overview) 已经做了较好的总结
+
+TODO：trace by channel 和 trace by object types 有啥区别，解释 sweep by channel，sweep by object type 和 sweep by profile 有什么区别，以及相应的参数 `FCollisionQueryParams`，`FCollisionResponseParams`，`FCollisionObjectQueryParams` 的各个字段的含义。`FCollisionQueryParams` 中有一个 `IgnoreMask`，它是怎么使用的，是不是和 body instance 中的 `MaskFilter` 一起用的。我看到一个汇总的函数是 `FBodyInstance::BuildBodyFilterData`，它会根据 `MaskFilter`，`CollisionResponses`，`ObjectType` 等等信息，创建出了 `FCollisionFilterData`
 ### Collision Setup
 simple collision 保存在 `UBodySetup` 中，primitive component 函数提供了一个 `GetBodySetup` 虚函数，子类可以重载
 ```c++
@@ -35,8 +37,10 @@ scene component 默认的实现非常简单，就是更新该 component 和子 c
 * 首先是确认并将 component 移动到终点位置
 	* 对于 non sweep 的情形，类似于 scene component，就直接设置为终点坐标即可
 	* 而对于 non sweep 情形，会调用 `UWorld::ComponentSweepMulti` 函数来获取一路上的 hit 物体。这里的 hit 有 blocking hit 和 overlap hit，如果 hit result 的 `bStartPenetrating` 为真，说明在 sweep 前这俩物体就有重叠了，但如果移动的方向是两物体分离的趋势，即 hit result 的 `impactNormal` 与移动方向的夹角小于 90 度，那么就会忽略这个 hit result，这就是为什么上面观察到 cube 的移动方向稍微向上一点就能够动起来了。因为 ue 判定贴在地面的物体与地面有初始重叠，当设置移动方向向上一点时才能使其忽略这个初始的碰撞结果。然后 overlap hit 的结果保存在 `PendingOverlaps` 中。component 的终点坐标设置为最早发生 blocking hit 的位置
-* 然后是调用 `UpdateOverlaps` 函数更新 component 此时的 overlap 状态。这里一个优化是对于 sweep 的情形，由于已经知道一路上有哪些 overlap hit 了，因此只需要检测这些 overlap hit 对应的 primitive component 此时是否还和本 component 有 overlap 就行了。否则需要调用 `UPrimitiveComponent::ComponentOverlapMultiImpl` 函数来走一遍完整的 overlap 检测。primitive component 的 `OverlappingComponents` 字段保存了当前有 overlap 的物体，如果更新位置后有新的 overlap，那么调用 `BeginComponentOverlap` 将新的 overlap 物体加入到 `OverlappingComponents` 中并触发各种 overlap 回调，对称地，会调用 `UPrimitiveComponent::EndComponentOverlap` 来将不再 overlap 的物体从 `OverlappingComponents` 中移除并触发各种 overlap 回调。`UpdateOverlaps` 函数最后会递归地对子 component 调用 `UpdateOverlaps` 函数
+* 然后是调用 `UpdateOverlaps` 函数更新 component 此时的 overlap 状态。除了一路 sweep 过来得到的 `PendingOverlaps`，我们还需要知道在停止的位置上有哪些 overlaps，这里一个优化是说，在大部分情况下，停止位置的 overlaps 是包含在 `PendingOverlaps` 里的（除非用户还修改了 rotation，并且 `AreSymmetricRotations` 返回 false，表明旋转后可能引入了新的 overlaps），因此只需要检测 `PendingOverlaps` 中的物体是否还与自己有 overlap 即可（此时 `bIncludesOverlapsAtEnd` 为 true）。否则需要调用 `UPrimitiveComponent::ComponentOverlapMultiImpl` 函数来检测在当前位置还与哪些物体 overlap
+* primitive component 的 `OverlappingComponents` 字段保存了当前有 overlap 的物体，如果更新位置后有新的 overlap，那么调用 `BeginComponentOverlap` 将新的 overlap 物体加入到 `OverlappingComponents` 中并触发各种 overlap 回调，对称地，会调用 `UPrimitiveComponent::EndComponentOverlap` 来将不再 overlap 的物体从 `OverlappingComponents` 中移除并触发各种 overlap 回调。`UpdateOverlaps` 函数最后会递归地对子 component 调用 `UpdateOverlaps` 函数
 * 最后如果有 blocking hit，调用 blocking hit 相关的回调
+* 在 `InternalSetWorldLocationAndRotation` 更新 component 的位置时，会触发 `UPrimitiveComponent::OnUpdateTransform` 回调，这个回调将 component 当前的位置同步给物理世界
 
 与 overlap 相关的回调包括 `Actor::NotifyActorBeginOverlap`，`Actor::NotifyActorEndOverlap` 这两个可重载的虚函数，它们在 actor 中默认是实现是分别调用 `Actor::ReceiveActorBeginOverlap`，`Actor::ReceiveActorEndOverlap` 函数，后者这俩是 `BlueprintImplementableEvent` 的，可以在蓝图中重载。然后是 `Actor` 的 `OnActorBeginOverlap` 与 `OnActorEndOverlap` 字段，它们是两个动态多播。再者是 primitive component 的 `OnComponentBeginOverlap` 与 `OnComponentEndOverlap` 字段，它们也是两个动态多播
 
@@ -45,8 +49,9 @@ scene component 默认的实现非常简单，就是更新该 component 和子 c
 然后区分 hit result 中一些容易混淆的字段，`impactNormal` 是碰撞点的被碰撞物体的法线，而 `Normal` 在大部分情况就是 `imapctNormal`，只有在 sphere trace 和 capsule trace 时表示这个 trace object 在碰撞点的法线。`impactPoint` 表示碰撞点，而 `Location` 则表示碰撞时物体所在的位置
 
 前面提到当 `bsweep` 为 false 时，一个 cube 在碰撞到物体后还发生了转动，这并不是在 `MoveComponentImpl` 函数中实现的，这个函数就只会把 cube 移动到目标的位置，不管它现在是否发生重合了。断点调试发现物理系统那边的 `FPhysScene_Chaos::OnSyncBodies` 函数又调用 `MoveComponent` 函数把 cube 给挤出来了。而 `bsweep` 为 true 时不会发生转动是因为此时 cube 都不会移动到物体内部了，物理系统那边自然也不会把它给挤出来了，从而也没有旋转了
+#### Scoped Movement Stack
+它主要是对移动逻辑的优化，在例如 character movement component 等组件的移动中，为了找到合理的移动位置，可能会进行多次移动，每次移动都更新物理世界的位置之类的太费了，声明一个 `FScopedMovementUpdate` 后，child transform update，物理世界的坐标更新，以及 overlaps 和 blocking hit 事件的广播，都会推迟到 `FScopedMovementUpdate` 析构的时候进行
 
-TODO：scene component 中的 ScopedMovementStack 是干嘛的 
 TODO：捋清移动有子节点的 primitive component 时碰撞逻辑，多个 component 时碰撞盒又是怎样的？如何设置 component 的碰撞盒（我直观上还是觉得应该是父子的碰撞，overlap 检测是相互独立的才对）
 * 我把两个 cube 作为父子节点串一块，发现移动父节点时能够正常检测到子节点的碰撞，但好像 collision preset 用的是父节点的设置？即使子节点设置为 overlap 也依然发生的是 blocking hit。但尝试移动子节点时却发现没有检测到碰撞？子节点直接就飞了
 * 说到底，多个 component 时 ue 是怎么选的碰撞盒
@@ -119,6 +124,8 @@ scene component 以及它的子类已经实现了关键的 `MoveComponentImpl` �
 参考了
 * [Exploring in UE4：移动组件详解](https://zhuanlan.zhihu.com/p/34257208)
 * [UE4的移动碰撞](https://zhuanlan.zhihu.com/p/33529865)：它里面获取碰撞以及 resolve penetration 的讨论再看看。TODO：他认为 `UPrimitiveComponent::MoveComponentImpl` 是优先选取非 start penetration 的 hit result？
+
+Character Movement Component 中已经定义了若干移动模式，如果要禁止移动，可以调用 `UMovementComponent::StopMovementImmediately` 后将 movement mode 设置为 `MOVE_None`
 ##### Jump
 character movement component 的 jump 逻辑受 character 的 `JumpKeyHoldTime` 和 `JumpMaxCount` 字段影响。`JumpKeyHoldTime` 是指一次 jump 的持续时间的最大值。所谓持续时间，就是在这段时间里会维持 jump 的初速度，不会受重力影响而减小。而 `JumpMaxCount` 指定可以在空中连续跳多少次
 ```c++
@@ -181,7 +188,6 @@ character movement component 的 jump 逻辑受 character 的 `JumpKeyHoldTime` 
 一旦到达 `JumpKeyHoldTime` 或者用户松开空格键触发 `ACharacter::StopJumping` 回调或者落地结束 Falling 状态时，都会调用 `ACharacter::ResetJumpState`，重置 jump 的状态（不过仅有落地时会重置 `JumpCurrentCount`）
 ##### Walking
 TODO：学了物理之后再来看看 `UMovementComponent::ResolvePenetrationImpl` 怎么处理的
-TODO：看看 `UCharacterMovementComponent::UpdateBasedMovement` 是怎么处理移动平台的，感觉与 `bImpartBaseVelocityX` 有些关系
 TODO：看看 ``UCharacterMovementComponent` 中是怎么处理 Root Motion 的
 TODO：一些尝试的实现：恒定速度，世界翻转，平台移动，斜坡上下滑
 
