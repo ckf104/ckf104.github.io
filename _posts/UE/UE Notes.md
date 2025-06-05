@@ -65,6 +65,10 @@ $ ./Engine/Build/BatchFiles/RunUBT.bat  UnrealEditor Development Win64 -Mode=Gen
 ```
 * target 为 UnrealEditor 的 compile_commands.json 不会包含编辑器默认没有启用的插件。如果 project 使用了默认没有启用的插件，那可以把 project 的 compile_commands.json 搬到引擎目录下，可以使用 clangd 的 if blocks 来合成多个 compile_commands.json，见 [Allow specifying more than one compile_commands.json file](https://github.com/clangd/clangd/issues/1092)
 * 如果报错 [Clang X64 must be installed in order to build this target](https://forums.unrealengine.com/t/error-clang-must-be-installed-in-order-to-build-this-target/483325)，需要设置环境变量 `LLVM_PATH` 为 LLVM 安装的目录
+
+TODO：
+* [编译UE5.2工程时遇到的MSVC和SDK版本问题](https://zhuanlan.zhihu.com/p/16534167796) 中谈到可以选择 msvc 的版本，如何选择 visual studio 的版本？unreal 是上哪找的 visual studio？
+* visual studio 可以安装 llvm 工具链，下次试试用 visual studio 装，而不是手动装
 ## UE Reflection and GC
 
 ### 关于 Reflection 的整体目标
