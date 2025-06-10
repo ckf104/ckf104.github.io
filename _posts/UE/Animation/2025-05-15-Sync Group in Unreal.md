@@ -145,8 +145,29 @@ TODO：结合 [Sync Groups](https://dev.epicgames.com/documentation/en-us/unreal
 ### Blend Space 中的同步标记
 TODO：解释 Blend Space 是如何利用同步标记的，可以看看 [UE4动画系统之同步组源码浅析](https://zhuanlan.zhihu.com/p/651145624)
 ### Montage 中的同步标记
-TODO：解释 montage 中如何使用同步标记
+`UAnimMontage` 中设置 `SyncGroup` 和 `SyncSlotIndex` 表明这个 montage 的 sync group，以及应该在哪个 slot track 上搜集 marker
+```c++
+	/** If you're using marker based sync for this montage, make sure to add sync group name. For now we only support one group */
+	UPROPERTY(EditAnywhere, Category = SyncGroup)
+	FName SyncGroup;
 
-TODO：blending in，blending   out 时动画混合的行为，混合时动画还会向前播吗
+	/** Index of the slot track used for collecting sync markers */
+	UPROPERTY(EditAnywhere, Category = SyncGroup)
+	int32 SyncSlotIndex;
+
+	UPROPERTY()
+	struct FMarkerSyncData	MarkerData;
+```
+`UAnimMontage::CollectMarkers` 负责实际地收集 marker，存放在 `MarkerData` 中。搜集的方法也很简单，就是这个 slot track 上按时间顺序出现的 `FAnimSegment` 对应的 animation asset 的时间轴上的 marker
+
+然后在 `FAnimMontageInstance::Advance` 正常步进，当 montage 处于淡出状态时，才会搜集步进过程中跨越的 marker（由于用户可以任意设置 section 的连接顺序，步进的过程和时间轴上 `FAnimSegment` 的先后顺序可能不一样），在 `UAnimInstance::UpdateMontageSyncGroup` 中将 montage 当前的播放状态作为一个 `FAnimTickRecord` 加入到对应的 sync group 中。这些都是在 game thread 上完成的
+
+然后 `UAnimMontage` 重载了 `TickAssetPlayer` 函数，因为之前已经在 game thread 上步进过了，因此重载后的函数只需要设置在该 montage 是 leader 时设置 `FAnimAssetTickContext` 的各项数据即可
+
+TODO：由于 section 导致 montage 的播放顺序和时间轴上 `FAnimSegment` 的先后顺序可能不太一样，而且 montage 标记 `PreviousTime` 和 `CurrentTime` 是用的时间轴上的时间，而不是实际的播放时间，因此我感觉在用 sync group 且不用 sync marker，并且设置跳跃连接的 section 时会导致 follower 跳跃的情况....
+
+Notes：`UAnimInstance` 提供的 `MontageSync_Follow` 函数是用来让多个 montage 同步播放的（在淡入和正常播放时有效，开始淡出时就无效了，因此它的作用和 sync group 没有关系）
+
+
 
 TODO：解释 transition leader 和 transition follower 的作用
