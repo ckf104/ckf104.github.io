@@ -66,16 +66,6 @@ struct FReferenceSkeleton
 	TArray<FTransform>		FinalRefBonePose;
 }
 ```
-#### Slot Groups
-```c++
-	// serialized slot groups and slot names.
-	UPROPERTY()
-	TArray<FAnimSlotGroup> SlotGroups;
-
-	/** SlotName to GroupName TMap, only at runtime, not serialized. **/
-	TMap<FName, FName> SlotToGroupNameMap;
-```
-感觉是用来对动画做分类的，在第三人称模板中有两个 slot group，default group 和 additive group，然后例如 default group 中又包含 default slot，full body，upper body 等等 slot
 #### Socket
 ```c++
 void USkinnedMeshComponent::QuerySupportedSockets(TArray<FComponentSocketDescription>& OutSockets);
@@ -107,7 +97,6 @@ FVector RelativeScale;
 FTransform USkinnedMeshComponent::GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace);
 ```
 TODO：virtual bone？
-TODO：bone proxy？在 animation sequence editor 中可以查看动画中每帧中每个 bone 的 local transform 和 reference transform 以及 mesh relative transform，local transform 就是相对父节点的 transform，reference transform 就是标准位姿下这个 bone 的 transform，那 mesh relative transform 是个啥玩意, 在 content example 的 示例中，有 root motion 的动画里 root 的 mesh relative transform 在持续变化
 ### Skeletal Mesh
 对应 `USkeletalMesh` 类，它包含一个指向 skeleton 的指针，表示这个 mesh 对应的 skeleton
 ```c++
@@ -160,17 +149,6 @@ TODO：animation blueprint 中的 slot node 的 `Always Update Source Pose` 选�
 #### Slot
 
 ### Animation Blending
-blending 时动画会正常播放（不论是正在 blend in 还是 blend out 的动画）
-TODO：那比如在一个动画播到一半时开始插入 montage，这样一个动画的中间部分和一个动画的开始部分进行 blend 如何对齐呢？
-#### Blending Node
-TODO：文档 [Blend Nodes](https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-blueprint-blend-nodes-in-unreal-engine?application_version=5.4) 中介绍了 animation blueprint 中可以使用的各种 blend 模式
-
-相比对最终的顶点进行 blending，显然逐关节的变换进行 blending 更合适，这样过渡会更加自然
-TODO：apply additive 节点和 apply mesh space additive 节点，这个加法要怎么做呢，[ozz-animation samples](https://guillaumeblanc.github.io/ozz-animation/samples/) 中有做 additive animation 的例子，很有必要看看。另外 mesh space vs local space，看起来 local space 其实就是 bone space，而 mesh space 就是 model space，apply additive 和 apply mesh space additive 分别适用于 local space additive animation 和 mesh space animation，类似地 layered blend per bone 而也有 Mesh Space Rotation Blend 和 Mesh Space Scale Blend 选项，我尤其关心计算细节，需要看看源码，用公式把这个 blending 表示出来
-* 我实际试了一个例子，在三人称模板中用 layered blend per bone 混合 base pose 为 idle 的第 0 帧和 base pose 0 为 run fwd 第 0 帧，感觉开启 Mesh Space Rotation Blend 选项后的结果更符合预期。应该说，开启该选项后，混合后的结果更贴近单纯 run fwd 输出的结果。我目前的解释是因为 Mesh Space 的混合会考虑父节点的效果。例如我设置从关节 spine_02 开始混合，如果为 local space 的混合，那么在 spine_02 处混合后，最终 spine_02 的关节的矩阵应该还有乘以父节点等等的旋转结果，但是由于是从 spine_02 开始混合的，它以上的变换完全丢失了，因此最终看到的结果差异很大，但如果是 mesh space 的混合，是先算出 spine_02 在 mesh space 下的变换矩阵再进行混合，由于这个变换矩阵已经考虑过 spine_01 这些父关节的变换了，因此得到了一个与原来的位姿更接近的结果
-* 但上面的理解无法解释为什么我开启 Mesh Space Rotation Blend 后，将 blend 的关节从 spine_02 下调到 spine_03 后，动画中人物手的位置发生了移动。因为根据上面的理解，节点的 mesh space 变换矩阵不依赖于设置的混合的位置才对。我现在的理解是 手是只发生了移动，即只有 translation 变了，但 rotation 没有变，因此没有矛盾的地方，也许这里还需要细看源码，关注 translation 是怎么算的（动画蓝图中的一个 pose 对应到 C++ 代码是怎么样的
-* 另外一个问题，我将 layered blend per bone 中的 bone 设置为 root，且 blend pose 0 的权重设置为 1，得到的结果就和 blend pose 0 完全一样了。这个应该还好理解，这说明它就是做一个纯粹的 blend，而不是 additive 那种，所以权重设置为 1 就表示完全地使用 blend pose 0 的结果
-* layered blend per bone 的 Curve Blend Option 选项是怎么用的
 #### Blending Space
 TODO：理解 2D blending space
 TODO：文档 [Blend Spaces in Animation Blueprints](https://dev.epicgames.com/documentation/en-us/unreal-engine/blend-spaces-in-animation-blueprints-in-unreal-engine?application_version=5.4) 中谈到的 blend space graph 是个什么玩意
