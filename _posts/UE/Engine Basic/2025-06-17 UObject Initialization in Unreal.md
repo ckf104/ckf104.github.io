@@ -1,5 +1,17 @@
+### Flow
+* 加载 CoreUObject 模块时，触发 uobject 类的 uclass  构造，以及静态数据的注册
+* 随后 `FCoreUObjectModule::StartupModule` 中调用 `UClassRegisterAllCompiledInClasses`，创建出各个类的 uclass，并把这些 uclass 注册到 `FPendingRegistrant` 单链表中
+* 后续回调函数 `InitUObject` 在 `FEngineLoop::AppInit`（它是在 `PreInitPreStartupScreen` 阶段）中被调用
+	* 初始化 `GUObjectAllocator`（它负责分配 UObject 占用的内存），`GUObjectArray`（它负责分配 `FUObjectItem` 占用的内存），这之后就可以使用 `NewObject` API 了
+	* 调用 `UObjectProcessRegistrants` 使用 `FPendingRegistrant` 构成的单链表（注意，SuperStruct 指针在一开始创建 uclass 的时候就设置好了。因为子类的 uclass 创建依赖于父类的 uclass 创建）
+		* 将 uclass 注册到全局的 object array 中（这下有了 `NamePrivate`，`InternalIndex`）
+		* 创建 uclass 的 package（`OuterPrivate` 指向该 package）
+		* 将 `ClassPrivate` 指向 uclass 类的 uclass（因此 uclass 类的 uclass 的 `ClassPrivate` 指向自己）
+	* 创建 global transient package
+* 在 `FEngineLoop::PreInitPostStartupScreen` 中会调用 `ProcessNewlyLoadedUObjects`，这个函数就是一个全家桶，它除了调用 `UClassRegisterAllCompiledInClasses` 和 `UObjectProcessRegistrants` 来创建和注册各个类的 uclass 之外，会最终将所有 uproperty 和 ufunction 的信息写入到 uclass 中，并创建 CDO
+* 在 `FEngineLoop::PreInitPostStartupScreen` 中会调用 `FUObjectArray::CloseDisregardForGC`，这个函数中也会调用一次 `ProcessNewlyLoadedUObjects`
+### Note 1
 gen.cpp 中的 `IMPLEMENT_CLASS` 宏定义了 static 的 uclass 指针，这是我们能通过 `Class::StaticClass` 接口拿到 uclass 指针的原因
-
 
 整个 CoreUObject 模块的生成信息是特化的，源代码中没有出现 `include xxx.generated.h` 等，查看 Intermediate 目录中 CoreUObject 的生成信息包括
 ```
@@ -12,9 +24,7 @@ CoreNetTypes.generated.h  CoreOnline.generated.h  NoExportTypes.gen.cpp
 ```c++
 static TArray<FFieldCompiledInInfo*> DeferredClassRegistration;
 ```
-
-**TODO：但是 `IMPLEMENT_CORE_INTRINSIC_CLASS` 和 `IMPLEMENT_INTRINSIC_CLASS` 还会额外定义一个静态对象 `FCompiledInDefer`**
-
+ 另外一个全局信息是 `FCompiledInDefer`（这俩在 UE5 里变为了 Inner Register 和 Outer Register，不过充当的角色都是一样的）
 
 `DeferredClassRegistration` 在 `UClassRegisterAllCompiledInClasses` 函数中使用，该函数调用 `Class::StaticClass` 接口，将这些类的 uclass 都创建出来
 
@@ -28,7 +38,11 @@ static TArray<FFieldCompiledInInfo*> DeferredClassRegistration;
 * `UObjectBaseInit`
 * `ProcessNewlyLoadedUObjects`
 
+uobject 的 uclass 也是一个 uobject，因此这个 uclass 也有 `ClassPrivate` 指针，它指向的是 uclass 的 uclass，但 uclass 又是 uobject 的子类。因此这里会存在一个循环依赖的问题。UE 里是先构建 uobject 的 uclass，此时这个 uclass 的 `ClassPrivate` 指针为空
 
+
+
+TODO：解释 UE::GC::DeclareIntrinsicMembers
 
 参考
 * [UObject（五）类型系统信息收集](https://zhuanlan.zhihu.com/p/26019216)
