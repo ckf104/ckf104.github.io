@@ -205,6 +205,16 @@ struct alignas(PLATFORM_CACHE_LINE_SIZE) FWorkerContext
 因此为了保证能够将 cluster objects 的指向 garbage 的引用也置空，我们需要对上面的引用置空逻辑叙述打额外的两个补丁
 * 指向 cluster root 的引用可能来自任何引用该 cluster 的 cluster 中的 obj。因此在 StartReachabilityAnalysis 阶段遍历 cluster 数组时，就会判断该 cluster root 是否是 garbage，如果是的话，就递归地将该 cluster，以及所有直接或间接引用该 cluster 的 cluster 都销毁掉
 * 指向 mutable objects 的引用来自本 cluster 的 obj。在 processor 的 `HandleValidReference` 处理引用时，将 cluster 的 mutable objects 都加入到 `FWorkerContext` 的 `ObjectsToSerialize` 中之前，它会检查每个 mutable objects 是否是 garbage，如果是，会将该 cluster 的 `bNeedsDissolving` 设置为 true，并且将 cluster 中所有的 obj 都加入到 `ObjectsToSerialize` 中，因此后续将遍历 cluster 的所有 objects 来将指向 mutable objects 的引用置空
+##### 2025.06.18 Update
+清楚了 cluster 中 `ReferencedClusters` 和 `ReferencedByClusters` 以及 `MutableObjects` 的含义后，会发现 `UObjectBaseUtility::AddToCluster` 的实现是有问题的。假设加入一个 object 到已有的 cluster A 中，如果我们遍历该 object 直接和间接的引用得到了新的 cluster 引用 Bs 和 mutable objects objs（s 表示可能有多个 cluster），那么我们需要
+* 在 cluster Bs 的 `ReferencedByClusters` 中加入 cluster A
+* 在 cluster A 的 `ReferencedClusters` 中加入 cluster Bs 以及 cluster Bs 的 `ReferencedClusters`
+* 在 cluster A 的 `MutableObjects` 中加入 objs 以及 cluster Bs 中的 `MutableObjects`
+* 递归遍历 cluster A 的 `ReferencedByClusters`，得到所有直接或间接引用 cluster A 的 cluster Ks
+	* cluster Ks 的 `ReferencedClusters` 中加入 cluster Bs 以及 cluster Bs 的 `ReferencedClusters`
+	* cluster Ks 的 `MutableObjects` 中加入 objs 以及 cluster Bs 中的 `MutableObjects`
+
+但是源码的实现只处理了 1，2，3 步，没有递归遍历 cluster A 的 `ReferencedByClusters`。但是新创建 cluster A 并收集引用时则不需要考虑 cluster A 的 `ReferencedByClusters`，**因为新创建的 cluster 不可能被已有的 cluster 引用**
 ### Purge
 最后我们讨论 GC 的 Purge 阶段。这个阶段由 `PostCollectGarbageImpl` 函数实现，它做了下面的事情来回收不可达的 objects
 1. 首先是交换 `GUnreachableObjectFlag` 和 `GMaybeUnreachableObjectFlag`，那么之前没有访问到的 object 都被标记上了 unreachable
