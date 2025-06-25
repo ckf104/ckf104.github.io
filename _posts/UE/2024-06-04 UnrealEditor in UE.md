@@ -1,25 +1,8 @@
-[Actor蓝图之CDO与SCS](https://zhuanlan.zhihu.com/p/681252301) 中谈到了若干种不同的蓝图类，包括
+### MISC
 
-* 蓝图类（UBluePrint 类）
-* 蓝图骨骼类（UBlueprintGeneratedClass 类），它保存在 UBluePrintCore（UBluePrint 的基类）的 SkeletonGeneratedClass 字段中
-* 蓝图产生类（UBlueprintGeneratedClass 类），它保存在 UBluePrintCore 类的 GeneratedClass 字段中
+cmd 命令 `ShowFlag.Collision 1` 可以在编辑器和游戏中显示 static mesh 的碰撞体，而 level editor 的 show -> collision 只会在编辑器中显示碰撞体 
 
-根据 [UE4蓝图解析（一）](https://zhuanlan.zhihu.com/p/69067129) 中的描述，编辑器里面编辑的蓝图的各项属性，都存在 UBluePrint 类中，因此编辑器中调整蓝图就是在调整这个类
-
-> 其实，蓝图编译过程就是把UBlueprint描述的信息转换为BlueprintGeneratedClass的过程
-
-**值得注意的是，BlueprintGeneratedClass 是 UClass 的子类，因此我认为它是实际执行的蓝图类的元类（如果这个蓝图继承自 Actor，那么实际执行的蓝图类当然是 Actor 的子类）**
-
-经过测试，在蓝图产生类的 CDO 中（这个描述准确吗），不包含在编辑器里面设置的 component（SCS 界面或者在 construction script 中）
-
-[cdo-get-blueprint-components](https://erlite.dev/cdo-get-blueprint-components/) 中记录了如何根据 CDO 来获取蓝图中的 component
-
-[【UE·蓝图底层篇】一文搞懂NativeClass、GeneratedClass、BlueprintClass、ParentClass](https://blog.csdn.net/j756915370/article/details/121556800) 这篇讲得也不错
-
-TODO：蓝图类 vs 蓝图产生类？
-
-Level BluePrint 是什么？
-
+下面这些是以前的东西
 ## Material Editor
 
 **任何不理解的地方，看看编译出来的 Shader code 多半就知道了**
