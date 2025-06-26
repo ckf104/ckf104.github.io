@@ -30,7 +30,7 @@
 * 多播代理能够同时绑定多个需要调用的函数。`DECLARE_MULTICAST_DELEGATE` 系列宏实际上 typedef 了一下 `TMulticastDelegate<>` 模板，它内部也只有来自基类的 `TMulticastDelegateBase` 的成员变量 `InvocationList`，`CompactionThreshold`，`InvocationListLockCount`
   * 最核心的是这个 `InvocationList`，它是一个由 `TDelegateBase` 组成的动态列表。调用代理的 `Broadcast` 时，会遍历这个 `InvocationList` 中的 `TDelegateBase`，获取它的 `DelegateInstance`，然后调用 `DelegateInstance` 的 `ExecuteIfSafe` 函数
 * 当我们调用 `TMulticastDelegate` 的 `AddStatic`，`AddUObject` 等函数时（它们对应单播情况的 `BindStatic`，`BindUObject`），`TMulticastDelegate` 会创建一个 `TDelegate`，它内部的 `DelegateInstance` 保存了调用需要的所有信息（具体保存了哪些信息已经在单播代理中讲过了）。然后将这个 `TDelegate` 加入到 `InvocationList` 中
-* 每个 `DelegateInstance` 都有一个唯一的 `FDelegateHandle`，调用 `AddStatic` 等函数时，会将创建的 `DelegateInstance` 的 `FDelegateHandle` 作为返回值返回。如果要移除某一个函数，调用 `Remove` 函数时传入这个 Handle
+* 每个 `DelegateInstance` 都有一个唯一的 `FDelegateHandle`，调用 `AddStatic` 等函数时，会将创建的 `DelegateInstance` 的 `FDelegateHandle` 作为返回值返回。如果要移除某一个函数，调用 `Remove` 函数时传入这个 Handle（**可以在回调函数内调用 `Remove`，多播内部有个 counter 来避免 for 循环过程中删除元素产生错误**）
 * 多播代理不保证各个函数的调用顺序
 
 ### 动态代理（Dynamic Delegates）

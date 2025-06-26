@@ -41,6 +41,14 @@ static TArray<FFieldCompiledInInfo*> DeferredClassRegistration;
 uobject 的 uclass 也是一个 uobject，因此这个 uclass 也有 `ClassPrivate` 指针，它指向的是 uclass 的 uclass，但 uclass 又是 uobject 的子类。因此这里会存在一个循环依赖的问题。UE 里是先构建 uobject 的 uclass，此时这个 uclass 的 `ClassPrivate` 指针为空
 ### Note 2
 由于 CoreUObject 中不会使用 uproperty 等标记，因此 CoreUObject 中的类的 uclass 的 `PropertyLink` 为空。但 GC 系统需要根据 `PropertyLink` 生成 token stream，因此这些类中使用 `UE::GC::DeclareIntrinsicMembers` 显式地声明自己引用的字段
+### User Module 的加载时机
+时间顺序大概是这样
+* CoreUObject 先加载
+* `EarliestPossible` 和 `PostConfigInit` 类型的 user module 加载
+* `InitUObject` 被调用，此后可以使用 NewObject API 了
+* 然后是加载 `PostSplashScreen` 到 `PostDefault` 类型的 user module
+* `CloseDisregardForGC` 被调用
+* 加载 `PostEngineInit` 类型的 user module
 ### Disregard From GC
 `FUObjectArray` 用于负责分配 `FUObjectItem`，在初始时根据最大的 uobject 数目分配 chunk 指针数组，每个 chunk 能容纳 64 * 1024 个 `FUObjectItem`（**TODO：从代码上看起来全局的 uobject 数量就不能超过这个数？**）
 
@@ -57,13 +65,12 @@ index 在 `MaxObjectsNotConsideredByGC` 内的 object 不参与 GC，这意味�
 
 如果这个 object 在永久内存池中，可达性分析时可以直接通过指针的值来判断出它不用参与 GC，而不需要再解引用比较 `EInternalObjectFlags::Unreachable` 标记，减少 GC 的内存访问。因此永久内存池通常和 `MaxObjectsNotConsideredByGC` 同时使用，保证不参与 GC 的对象同时也在永久内存池中
 
-在 UE4 的垃圾回收里，首先是 `MarkObjectsAsUnreachable`，会将非 root set 的普通 object 以及 cluster 中不包含 root set 的 cluster root 都标记上 `EInternalObjectFlags::Unreachable`
 
 参考
 * [UObject（五）类型系统信息收集](https://zhuanlan.zhihu.com/p/26019216)
 * [UObject（七）类型系统注册-第一个UClass](https://zhuanlan.zhihu.com/p/57005310)
+* [UE4 垃圾回收](https://zhuanlan.zhihu.com/p/67055774)
+* [UE4 UObject管理方式](https://zhuanlan.zhihu.com/p/362228148)
 
 
-TODO：游戏模块在 `CloseDisregardForGC` 之前还是之后加载？
-TODO：解释 `EInternalObjectFlags::ReachableInCluster`
-TODO：如果 unload module 会怎样？CDO 这些会释放掉吗
+TODO：如果 unload module 会怎样？CDO 这些会释放掉吗：我觉得不会，就一直留在那了
