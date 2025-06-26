@@ -65,6 +65,9 @@ crazy game 上那个碰碰球游戏的复刻，加入本地双人，远程双人
 实现：锥形视角可视化，血条跟随人物，战争迷雾
 
 看的类型：rogue like，3D 平台，独立游戏？
+### RPG Notes
+拔剑混合的时候不好处理跳跃的情形
+
 #### 面试问题
 UE 的遮挡剔除：PVS，hierarchical z buffer
 UE 的 LOD 优化：hierachical LOD
