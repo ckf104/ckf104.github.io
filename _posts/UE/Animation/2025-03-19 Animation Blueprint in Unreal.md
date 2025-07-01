@@ -89,12 +89,12 @@ TODO：什么时候 `AnimEvaluationContext.bDoInterpolation` 为 true，它为 t
 --> `UPrimitiveComponent::SyncComponentToRBPhysics`：将物理模拟的结果同步回来，使得 `USkeletalMeshComponent` 的 component to world 的 transform 与物理世界保持一致
 --> `USkeletalMeshComponent::BlendInPhysicsInternal`
 ----> `USkeletalMeshComponent::PerformBlendPhysicsBones`：与物理世界的 bone transform 混合，得到最终的 bone space transform 与 component space transform
-----> `USkeletalMeshComponent::FinalizeAnimationUpdate`
+----> `USkeletalMeshComponent::FinalizeAnimationUpdate`：交换双缓冲，更新子 component 的 transform 和 overlaps
 ------> `USkeletalMeshComponent::FinalizeBoneTransform`：swap double buffer of component space transform
 
 如果 `ShouldBlendPhysicsBones` 返回 false（即不需要物理动画）则 `USkeletalMeshComponent::FinalizeAnimationUpdate` 将会在 `USkeletalMeshComponent::PostAnimEvaluation` 中被调用
 ### Modular Characters
-根据文档 [Working with Modular Characters](https://dev.epicgames.com/documentation/en-us/unreal-engine/working-with-modular-characters-in-unreal-engine)，源码中出现的 `LeaderPoseComponent` 原来是用作d
+根据文档 [Working with Modular Characters](https://dev.epicgames.com/documentation/en-us/unreal-engine/working-with-modular-characters-in-unreal-engine)，源码中出现的 `LeaderPoseComponent` 原来是用作
 
 
 TODO：[UE 动画系统框架源码解析](https://zhuanlan.zhihu.com/p/673924647) 讲得很全，需要再看看，以及 [UE4 图解动画系统源码](https://zhuanlan.zhihu.com/p/446851284) 也可以看看

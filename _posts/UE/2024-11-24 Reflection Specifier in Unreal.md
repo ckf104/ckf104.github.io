@@ -22,3 +22,6 @@ BlueprintNativeEvent：C++ 中可加个 `_Implementation` 后缀进行定义，�
 ### META
 AllowPrivateAccess，如果该 uproperty 使用 BlueprintReadOnly 或 BlueprintReadWrite 标记了，并且是私有成员，那么需要使用 AllowPrivateAccess 标记
 BlueprintSpawnableComponent，表示可以通过 SCS 添加进 actor
+
+### UInterface
+[How do i expose a C++ Interface to Blueprints with a BlueprintCallable function?](https://forums.unrealengine.com/t/how-do-i-expose-a-c-interface-to-blueprints-with-a-blueprintcallable-function/342082) 中提到了 **CannotImplementInterfaceInBlueprint**，此时可以将 ufunction 标记为 virtual

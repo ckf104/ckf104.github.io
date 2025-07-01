@@ -67,6 +67,12 @@ crazy game 上那个碰碰球游戏的复刻，加入本地双人，远程双人
 看的类型：rogue like，3D 平台，独立游戏？
 ### RPG Notes
 TODO：拔剑混合的时候不好处理跳跃的情形
+TODO：处理 enemy 的转身滑步
+TODO：enemy 在攻击时也会 focus player，跟着 player 一起转，关了是不是好些
+TODO：修正 move to 即使没有靠近 player 也返回 true 的问题，见 [AI MoveTo always reports Success?](https://forums.unrealengine.com/t/ai-moveto-always-reports-success/478210)
+TODO：近战攻击的命中判定
+* 在命中帧给一个判定框：如果攻击动画比较慢的话容易给人一种延时感（就是击中了之后才触发受击动画）
+* 给武器一个 trigger box，在 overlap 时触发命中逻辑
 #### Combo
 巫师三里的 combo 触发判定比较松，核心是在角色挥击完上一剑后会有一段暂留时间，玩家可以选择要不要继续连击，**因此下一击衔接的时间是可变的，而不是一个固定的连击动画**
 

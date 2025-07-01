@@ -7,6 +7,8 @@
 ### Slate Brush
 这个结构体来指定一个 UI 元素的外观。例如 button 就包含 normal，pressed，hovered，disabled 四个 slate brush 来指定各种状态下 button 的外观
 
+Draw As 字段用来控制如何绘制该 image，其中 box 和 border 是基于 [9-slice scaling](https://en.wikipedia.org/wiki/9-slice_scaling) 进行缩放的。margin 控制四个角上不进行缩放的 image 的占比，具体效果见 [WTF Is? Slate Brush in Unreal Engine 4](https://www.youtube.com/watch?v=kYxGC0WV0Uk) 中的实验
+
 TODO：解释 slate brush 中各个字段的含义，以及它如何控制渲染效果
 ### UPanelWidget and UPanelSlot
 `UPanelWidget` 的子类才有子节点，有 1 个还是多个子节点取决于 `bCanHaveMultipleChildren` 字段的值，在 `UPanelWidget` 的构造函数中默认为 true

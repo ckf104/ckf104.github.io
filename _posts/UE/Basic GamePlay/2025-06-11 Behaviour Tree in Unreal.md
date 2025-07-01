@@ -33,4 +33,8 @@ decorator 节点的几个回调
 * 假设有新的行为树资产 U2，则 U2 的实例不与 U 的实例共享节点，即使这些节点可能是同一类的 task
 ### 内存
 TODO：解释 special memory 和 instance memory 的区别
+### 组件
+AI Controller 首次运行行为树时，会创建 `UBlackboardComponent` 和 `UBehaviorTreeComponent`
+
+`UBehaviorTreeComponent` 里可能运行的不止一个行为树，因为可以通过 run behavior tree 这个 task 节点嵌套新的行为树进来运行，因此 `UBehaviorTreeComponent` 中维护了一个 `InstanceStack` 来表示当前活跃的行为树实例
 

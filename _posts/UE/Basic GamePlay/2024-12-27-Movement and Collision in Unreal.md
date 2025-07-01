@@ -55,9 +55,10 @@ scene component 默认的实现非常简单，就是更新该 component 和子 c
 TODO：捋清移动有子节点的 primitive component 时碰撞逻辑，多个 component 时碰撞盒又是怎样的？如何设置 component 的碰撞盒（我直观上还是觉得应该是父子的碰撞，overlap 检测是相互独立的才对）
 * 我把两个 cube 作为父子节点串一块，发现移动父节点时能够正常检测到子节点的碰撞，但好像 collision preset 用的是父节点的设置？即使子节点设置为 overlap 也依然发生的是 blocking hit。但尝试移动子节点时却发现没有检测到碰撞？子节点直接就飞了
 * 说到底，多个 component 时 ue 是怎么选的碰撞盒
-* 以及 `MoveComponentImpl` 的实现里会递归地调用子节点的 `UpdateOverlaps`，这里的碰撞盒又用的谁的呢
+* 以及 `MoveComponentImpl` 的实现里会递归地调用子节点的 `UpdateOverlaps`，这里的碰撞盒又用的谁的呢（看起来就是根据子节点的碰撞盒更新子节点的 overlaps）
 * 每个 mesh 的 simple / complex collision 又存储在哪的呢
-TODO：skeletal mesh component 的 `MoveComponentImpl` 实现
+#### Skeletal Mesh Component
+skeletal mesh component 不处理 overlaps，但是它下边可能挂一些需要处理 overlaps 的子 component（例如武器），因此 `MoveComponentImpl` 的实现就是调用子 component 的 update overlaps 函数，更新它们的 overlap 情况（这样的实现的一个缺点就是子 component 的 overlap info 没有详细的几何数据，例如最初发生碰撞的位置，法线等等），另外，在动画改变了 skeletal mesh component 的 transform 后，子 component 的 overlaps 会类似地更新
 ### Movement Component
 scene component 以及它的子类已经实现了关键的 `MoveComponentImpl` 函数。movement component 则负责管理和按照一些规则更新 scene component 的速度和加速度，并根据 scene component 的速度来调用 `MoveComponentImpl` 更新物体的位置。它的 `UpdatedComponent` 字段指定了需要管理的 scene component
 ```c++

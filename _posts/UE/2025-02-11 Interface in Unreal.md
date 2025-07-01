@@ -2,3 +2,6 @@
 * `execute_xxx` wrapper，是只有用 UFUNCTION 修饰的才有吗，没有 UFUNCTION 修饰函数我没找到对应的 wrapper
 * `TScriptInterface` 是个啥，为什么需要它
 * 为什么 blueprint implementable interfaces 没办法用 cast 转类型，并且只能用 `Execute_` static wrapper？
+
+通常 object 类中如果有标记了 `BlueprintNativeEvent` 的 ufunction ABC，那么 UE 这边生成这些东西
+* 成员函数 ABC 的定义，
