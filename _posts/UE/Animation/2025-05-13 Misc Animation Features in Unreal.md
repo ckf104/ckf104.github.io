@@ -7,5 +7,7 @@ Blend Space 中同时按住 ctrl 和 alt 可以显示当前的混合权重
 * 为什么设置 blend time 后需要加一个 Intertialization 节点
 
 TODO：解释 [motion wrapping](https://dev.epicgames.com/documentation/en-us/unreal-engine/motion-warping-in-unreal-engine) 和 [pose wrapping](https://dev.epicgames.com/documentation/en-us/unreal-engine/pose-warping-in-unreal-engine)
+### Animation Editing
+在动画编辑器中 add key to additive layer tracks 是什么意思，这是怎么编辑动画的
 
 

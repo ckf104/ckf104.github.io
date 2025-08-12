@@ -1,0 +1,1 @@
+TODO：这 decal 的 fade out 有问题，设置了也没用

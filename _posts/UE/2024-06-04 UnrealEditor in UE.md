@@ -141,8 +141,7 @@ TODO：UE 中关注的点
 * PCG 系统
 * skeletal mesh 和 animation
 
-
-
+TODO：深入研究一下 UE5 中 merge static mesh 是如何工作的，[Deep Dive into Merging | Unreal Engine 5 features](https://www.youtube.com/watch?v=pg54iwY0Go4) 
 
 
 ### 多 render 一致性

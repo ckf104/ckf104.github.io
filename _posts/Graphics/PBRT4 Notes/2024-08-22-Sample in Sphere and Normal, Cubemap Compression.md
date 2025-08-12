@@ -1,3 +1,12 @@
+---
+title: Sample in Sphere and Normal, Cubemap Comporession
+math: true
+date: 2024-08-22 16:13:27 +0800
+comments: true
+categories:
+  - Graphics
+---
+
 ## Sample in Disk and Sphere
 
 为了在 disk 上均匀采样，pbrt4 中使用了论文 A Low Distortion Map Between Disk and Square 中的方法，该论文认为 inversion method 算出来的映射有较大的 distortion，而它的 concentric map 则更好地保持了原来的形状。这样的好处是，例如我们通过低差异序列来生成随机数，那么这些随机数之间会隔得尽可能地远，如果这个变换的 distortion 比较小，那么我们会认为变换后的随机数仍然会相互之间隔得比较远，保留了低差异序列的优良性质

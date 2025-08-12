@@ -146,3 +146,7 @@ TODO：解释 `ICameraLensEffectInterface`，以及 `UCameraModifier`，UE 中�
 TODO：对这些出现的类的功能定位进行总结：player controller, player camera manager, camera component, view target, camera modifier 等等
 
 TODO：看看 UE 的 stereo rendering 的实现，它需要 camera 等做哪些额外的事情（standford 的课 [ EE267: Virtual Reality](https://stanford.edu/class/ee267/)
+
+### Camera Shake
+TODO：解释 world camera shake
+TODO：解释 camera modifier

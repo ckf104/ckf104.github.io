@@ -62,21 +62,39 @@ crazy game 上那个碰碰球游戏的复刻，加入本地双人，远程双人
 
 起步和停步怎么做，walk 或者 run 的动画的第一帧通常和的 Idle 态的位姿有差异
 
-实现：锥形视角可视化，血条跟随人物，战争迷雾
+实现：**锥形视角可视化，双人约束铰链，地板破碎塌陷**，对话系统，攀爬，勾绳索，布娃娃，战争迷雾
 
 看的类型：rogue like，3D 平台，独立游戏？
 ### RPG Notes
+**目前整个实现假设了被打断的 montage 不会再触发新的 notify，unreal 也确实是这么实现的（即使此时 montage 已经处于 blend out 状态了，也可以把它打断掉**
+* **例如在攻击时被 hit 了然后切换到 hit montage，我们不希望原来的 attack montage 再触发一个 end combo 把我们拉到 idle 状态**
+* **但是 unreal 里 montage 被打断了可能不会马上触发 montage end delegate，这造成了一些问题：我希望带 root motion 的冲刺在结束后会恢复原来的速度，但由于存在打断机制，例如跳跃打断了冲刺，如果此时 montage end delegate 在跳跃修改了速度之后才触发，会导致跳跃动作施加的速度被原来的速度覆盖掉了**
+* **现在的做法是在播放任何 montage 之前都要调用 BreakMontage 来手动打断其它 montage，手动触发这些回调，为了避免回调被调用多次，还加了版本检测**
+* **冲刺可以在任何时候被打断，因此又进行了额外处理：打断时如果 end combo 未被触发，手动切换状态**
+
 TODO：拔剑混合的时候不好处理跳跃的情形
 TODO：处理 enemy 的转身滑步
 TODO：enemy 在攻击时也会 focus player，跟着 player 一起转，关了是不是好些
 TODO：修正 move to 即使没有靠近 player 也返回 true 的问题，见 [AI MoveTo always reports Success?](https://forums.unrealengine.com/t/ai-moveto-always-reports-success/478210)
 TODO：近战攻击的命中判定
 * 在命中帧给一个判定框：如果攻击动画比较慢的话容易给人一种延时感（就是击中了之后才触发受击动画）
-* 给武器一个 trigger box，在 overlap 时触发命中逻辑
+* 给武器一个 trigger box，在 overlap 时触发命中逻辑（无法获得详细的 overlap 几何信息）
+* 每一帧做 trace：开销大，但是能获得详细的几何信息
+TODO：人鱼怪眼睛残留的问题，需要改下它的材质？
+TODO：蓝图中获取重力方向，保证 soul 是反重力移动的
+TODO：空中冲刺时停止下落
+TODO：人物坠落死亡重生
+TODO：验证冲刺约束是否生效，找明白为什么空中冲刺会跑很远：之前空中没有 braking，然后 root motion 后速度不会恢复到之前的状态，而是 root motion 最后的速度。另外，在空中时 root motion 仍然会下落，这些都改了
+TODO：连按两次跳跃时混合得不好看
+TODO：看起来在 begin play 的时候没有触发 initial overlap（勾索实现）
+
+TODO：root motion 与打断：root motion 进入打断期间后，root motion 仍然正常播放，一旦用户输入打断 root motion...
+* 如果 root  motion stop 的时间早于打断期：没问题
+* 如果 root motion stop 的时间晚于打断期：需要让用户输入提前打断
 #### Combo
 巫师三里的 combo 触发判定比较松，核心是在角色挥击完上一剑后会有一段暂留时间，玩家可以选择要不要继续连击，**因此下一击衔接的时间是可变的，而不是一个固定的连击动画**
 
-TODO：什么时候结束动画，开始混合比较合适？
+TODO：什么时候结束动画，开始混合比较合适？如何调整混合的时间？是否能播放一个 montage 时播放另一个 montage（打断？）
 #### 面试问题
 UE 的遮挡剔除：PVS，hierarchical z buffer
 UE 的 LOD 优化：hierachical LOD
