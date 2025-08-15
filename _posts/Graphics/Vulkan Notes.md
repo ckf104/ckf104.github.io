@@ -10,5 +10,20 @@
 在创建 buffer 时，storage buffer 和 uniform buffer 有什么区别：感觉就是前者是可读写的，后者是只读的
 
 TODO：解释 vulkan 里的各种 memory type
+TODO：跳过了 sparse image / buffer 的部分
+### Vulkan Memory
+通过 `vkGetPhysicalDeviceMemoryProperties` API 获取 memory type 和 memory heap
+
+`vkAllocateMemory` 分配 device memory 时需要指定使用哪种 memory type
+
+`vkGetBufferMemoryRequirements` 以及 `vkGetImageMemoryRequirements` 获取指定的 buffer 和 image 需要哪种 memory type
+
+为什么区分 memory type 和 memory heap，参考
+* https://stackoverflow.com/questions/51624650/vulkan-memoryheaps-and-their-memorytypes
+* https://stackoverflow.com/questions/48242445/why-does-vkgetphysicaldevicememoryproperties-return-multiple-identical-memory-ty#48243730
+* https://stackoverflow.com/questions/36436493/could-someone-help-me-understand-vkphysicaldevicememoryproperties/36437023#36437023
+
+`VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT`
+`VK_MEMORY_PROPERTY_HOST_COHERENT_BIT`
 
 
