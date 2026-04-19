@@ -844,7 +844,7 @@ TSharedPtr<SWindow> FTabManager::FPrivateApi::GetParentWindow() const
 
 用下方这张示意图会更好理解，整个 UE 的编辑器界面是 main frame 创建的 window，然后由 global tab manager 管理它的布局，level editor 是这个布局中的一个 docking stack 下打开的 tab，这个 tab 的内容是 `SLevelEditor`，然后红框部分是 level editor 下创建的 layout，由 level editor 创建的新的 tab manager 进行管理。可以看到，该 area 被进一步 split 为 4 个 `SDockingTabStack`（其中 viewport 的 tab 栏被隐藏了）
 
-![[Pasted image 20260419144102.png]]
+![UE editor layout overview](/assets/img/posts/ue/docking-tab/ue-editor-layout-overview.png)
 
 新建 tab manager 的原因
 
