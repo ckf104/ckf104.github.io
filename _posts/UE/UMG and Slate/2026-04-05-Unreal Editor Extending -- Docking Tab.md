@@ -1,6 +1,6 @@
 ---
 title: Unreal Editor Extending -- Docking Tab
-date: 2026-04-05 20::44 +0800
+date: 2026-04-05 20:44:21 +0800
 comments: true
 categories:
   - UE5
