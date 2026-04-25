@@ -140,7 +140,7 @@ C 语言的 locale 模型比较直接，它本质上依赖一个全局的 C loca
 
 C 标准库里的 `FILE stream` 还有一个很关键的概念叫 orientation。一个流在刚创建时还没有定向，第一次使用 narrow I/O 还是 wide I/O 会把它固定成 `narrow-oriented` 或 `wide-oriented`。之后除非 `freopen`，否则这个定向不会改变
 
-一旦流变成 `wide-oriented`，运行库就会在 `wchar_t` 与外部 `multibyte` 表示之间做转换，这个过程可以理解为内部调用 `mbrtowc` 和 `wcrtomb`，并由 `FILE stream` 内部的 `mbstate_t` 维护状态。更重要的是，流的转换状态是在它被定向为 `wide-oriented` 的那一刻，按照当时安装的 C locale 建立起来的。因此，如果先让 `stdout` 以 wide 方式工作，后面再去改 `setlocale`，新 locale 不一定会自动重建这个流已经建立好的转换状态。对 C 风格 I/O 来说，locale 的安装时机和流的首次使用顺序同样重要
+一旦流变成 `wide-oriented`，运行库就会在 `wchar_t` 与外部 `multibyte` 表示之间做转换，这个过程可以理解为内部调用 `mbrtowc` 和 `wcrtomb`，并由 `FILE stream` 内部的 `mbstate_t` 维护状态（[What is mbstate_t and why to reset it?](https://stackoverflow.com/questions/70432999/what-is-mbstate-t-and-why-to-reset-it) 中讨论了为什么需要一个 `mbstate_t`）。更重要的是，流的转换状态是在它被定向为 `wide-oriented` 的那一刻，按照当时安装的 C locale 建立起来的。因此，如果先让 `stdout` 以 wide 方式工作，后面再去改 `setlocale`，新 locale 不一定会自动重建这个流已经建立好的转换状态。对 C 风格 I/O 来说，locale 的安装时机和流的首次使用顺序同样重要
 
 ## 7. C++ 的 locale 环境
 
