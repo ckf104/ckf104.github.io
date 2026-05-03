@@ -125,27 +125,32 @@ module ObsidianWikilinks
   end
 
   def section_index(doc)
-    cached = doc.instance_variable_get(:@obsidian_wikilinks_section_index)
-    return cached if cached
+    doc.instance_variable_get(:@obsidian_wikilinks_section_index) || {}
+  end
 
-    counts = Hash.new(0)
-    headings = {}
+  def build_section_indices(site)
+    markdown_docs(site).each do |doc|
+      next if doc.instance_variable_get(:@obsidian_wikilinks_section_index)
 
-    each_non_fenced_line(doc.content) do |line|
-      heading_text = extract_heading_text(line)
-      next unless heading_text
+      counts = Hash.new(0)
+      headings = {}
 
-      base_id = kramdown_header_id(heading_text)
-      next if base_id.empty?
+      each_non_fenced_line(doc.content) do |line|
+        heading_text = extract_heading_text(line)
+        next unless heading_text
 
-      count = counts[base_id]
-      counts[base_id] += 1
-      generated_id = count.zero? ? base_id : "#{base_id}-#{count}"
+        base_id = kramdown_header_id(heading_text)
+        next if base_id.empty?
 
-      headings[heading_text] ||= generated_id
+        count = counts[base_id]
+        counts[base_id] += 1
+        generated_id = count.zero? ? base_id : "#{base_id}-#{count}"
+
+        headings[heading_text] ||= generated_id
+      end
+
+      doc.instance_variable_set(:@obsidian_wikilinks_section_index, headings)
     end
-
-    doc.instance_variable_set(:@obsidian_wikilinks_section_index, headings)
   end
 
   def each_non_fenced_line(content)
@@ -231,6 +236,10 @@ module ObsidianWikilinks
 
     Jekyll.logger.warn "ObsidianWikilinks:", "#{relative_path(source_doc)}: #{message}"
   end
+end
+
+Jekyll::Hooks.register [:site], :post_read do |site|
+  ObsidianWikilinks.build_section_indices(site)
 end
 
 Jekyll::Hooks.register [:documents, :pages], :pre_render do |doc|
