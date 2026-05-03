@@ -83,7 +83,7 @@ Path Tracer 额外增加了以下的特性
 * Russian Roulette
 * Path Regularization
 
-我们首先从 MIS 说起，在 Simple Path Tracer 中，为了计算长度为 n 的路径的 radiance 贡献，我们在路径的最后一个节点面向光源进行采样，但因为 radiance 的值还依赖于 BRDF，面向光源采样没有考虑到 BRDF 的值对 radiance 的影响。而根据 BRDF 采样又忽略了光源在计算 radiance 中的作用。这就是 MIS 的用武之地了。在 Simple Path Tracer 中，如果 BSDF 产生的路径击中了光源，我们也不会将它的 radiance 贡献加进来。但现在我们会计算这个 radiance 贡献，并和在上一个点面向光源采样得到的 radiance 贡献进行加权平均。这实际上对应有两个概率密度函数，它们的采样数各为 1 的 multi sample model，PBRT4 中使用的权重函数为指数为 2 的 power heuristic
+我们首先从 MIS 说起（关于 MIS 的基本讨论见 [[2024-07-28-Monte Carlo Integration#Multiple Importance Sampling|Multiple Importance Sampling]]），在 Simple Path Tracer 中，为了计算长度为 n 的路径的 radiance 贡献，我们在路径的最后一个节点面向光源进行采样，但因为 radiance 的值还依赖于 BRDF，面向光源采样没有考虑到 BRDF 的值对 radiance 的影响。而根据 BRDF 采样又忽略了光源在计算 radiance 中的作用。这就是 MIS 的用武之地了。在 Simple Path Tracer 中，如果 BSDF 产生的路径击中了光源，我们也不会将它的 radiance 贡献加进来。但现在我们会计算这个 radiance 贡献，并和在上一个点面向光源采样得到的 radiance 贡献进行加权平均。这实际上对应有两个概率密度函数，它们的采样数各为 1 的 multi sample model，PBRT4 中使用的权重函数为指数为 2 的 power heuristic
 
 但在实际应用时有一些注意事项和 trick（在后面我们会讨论这些 trick 是否会对无偏性产生影响），为了叙述方便，我们称点光源和方向光源为 δ 光源
 * 如果面向光源采样时采样到了 δ 光源，那么它们的加权值为 1。一种理解方式是，它们的概率分布是一个 δ 函数，从权重函数的表达式 $$w_{light} = \frac{p_{light}^2}{p_{brdf}^2+p_{light}^2}$$可以看出，当 $p_{light} \rightarrow +\infty$ 时，$w_{light} \rightarrow 1$
