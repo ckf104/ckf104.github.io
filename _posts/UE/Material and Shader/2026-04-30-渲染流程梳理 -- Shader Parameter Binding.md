@@ -81,7 +81,7 @@ C++ 侧 uniform buffer 的声明和 shader parameter struct 是类似的，只�
 
 ## 1. SHADER_PARAMETER 宏
 
-shader parameter struct 的字段由 `ShaderParameterMacros.h` 中的一组宏声明。它实现的反射机制与 shader parameter metadata 见 [[2025-10-07 Global Shader Compiling 2 in Unreal|Global Shader Compiling 2]]，这里我主要再对这些宏进行一个分类
+shader parameter struct 的字段由 `ShaderParameterMacros.h` 中的一组宏声明。它实现的反射机制与 shader parameter metadata 见 [[2025-10-07-Global Shader Compiling 2 in Unreal|Global Shader Compiling 2]]，这里我主要再对这些宏进行一个分类
 
 从后续绑定角度看，这些宏大致可以分成几类
 
@@ -132,7 +132,7 @@ shader parameter struct 的字段由 `ShaderParameterMacros.h` 中的一组宏�
 
 ## 2. shader 编译
 
-[[2025-10-07 Global Shader Compiling 3 in Unreal|Global Shader Compiling 3]] 涉及了一部分的 shader 编译流程，那篇文章讨论了以下的内容
+[[2025-10-07-Global Shader Compiling 3 in Unreal|Global Shader Compiling 3]] 涉及了一部分的 shader 编译流程，那篇文章讨论了以下的内容
 
 * global shader 的编译流程
 * uniform buffer 在编译时的处理
@@ -143,7 +143,7 @@ shader parameter struct 的字段由 `ShaderParameterMacros.h` 中的一组宏�
 * 编译得到的 spirv 代码
 * 描述 shader 使用了哪些 resource，每个 resource 的 descriptor set / binding 编号的元数据
 
-实际上 UE 就是这样做的，[[2025-10-07 Global Shader Compiling 3 in Unreal|Global Shader Compiling 3]] 中谈到，shader 的编译结果存放在 `FShaderMapResourceCode` 中
+实际上 UE 就是这样做的，[[2025-10-07-Global Shader Compiling 3 in Unreal|Global Shader Compiling 3]] 中谈到，shader 的编译结果存放在 `FShaderMapResourceCode` 中
 
 ```c++
 class FShaderMapResourceCode : public FThreadSafeRefCountedObject
@@ -282,7 +282,7 @@ CompileVulkanShader
 
 因此 vulkan RHI 拿到原始的 parameter map 后，需要判定哪些用到的 resource 属于 ue uniform buffer，哪些又应该归属于 global resource。归属 ue uniform buffer 的 resource 由 shader parameter struct 中引用的 ue uniform buffer 中的相应字段进行绑定，归属 global resource 的 resource 由 shader parameter struct 中的相应字段进行绑定
 
-那 vulkan RHI 是如何知道 shader 引用了哪些 ue uniform buffer 的呢，[[2025-10-07 Global Shader Compiling 3 in Unreal|Global Shader Compiling 3]] 中已经讨论过了，编辑器模式下会检索每个 `FShaderType` 的 shader 文件，匹配全局注册的 ue uniform buffer 的名称，确定每个 shader 可能引用哪些 ue uniform buffer
+那 vulkan RHI 是如何知道 shader 引用了哪些 ue uniform buffer 的呢，[[2025-10-07-Global Shader Compiling 3 in Unreal|Global Shader Compiling 3]] 中已经讨论过了，编辑器模式下会检索每个 `FShaderType` 的 shader 文件，匹配全局注册的 ue uniform buffer 的名称，确定每个 shader 可能引用哪些 ue uniform buffer
 
 Note: 这里没有从 shader parameter struct 来分析 ue uniform buffer 的使用，我觉得是为了兼容以前的手动声明 shader parameter 的方式，该模式使用 `GetUniformBufferParameter<T>() / SetUniformBufferParameter(...)` 这套 API 来设置 ue uniform buffer 参数，shader 中不会显式声明它将使用哪些 ue uniform buffer
 
