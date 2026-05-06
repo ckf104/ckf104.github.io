@@ -1,5 +1,5 @@
 ---
-title: 渲染流程梳理 -- Shader Parameter Binding
+title: Global Shader Compiling 3 in Unreal
 date: 2025-10-07 20:45:12 +0800
 categories:
   - Graphics
