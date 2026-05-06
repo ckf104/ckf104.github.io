@@ -4,6 +4,7 @@ date: 2025-08-30 19:37:22 +0800
 categories:
   - Graphics
   - Vulkan
+comments: true
 ---
 
 **TODO：解释 across queue 的同步**
@@ -56,7 +57,7 @@ access scope 就指定了在 src sync scope 中哪些写操作需要 *availabili
 
 讨论完 *sync scope* 和 *access scope*，我们来看看 vulkan 的同步原语是如何指定 *sync scope* 和 *access scope* 的
 ### Fence
-fence 用于 device 和 host 的同步，[synchronization-fences](https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#synchronization-fences) 文档中对在 queue submission command 中使用 fence 时，它的 *sync scope* 和 *access scope* 有更准确的描述。不过粗略地来讲，它保证在 fence signal operation 之后，在 queue submission 中提交的 commands，以及更早之前提交的 commands，它们的写操作在 device domain 上都 available 了
+fence 用于 device 和 host 的同步，[synchronization-fences](https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#synchronization-fences) 文档中对在 queue submission command 中使用 fence 时，它的 *sync scope* 和 *access scope* 有更准确的描述。不过粗略地来讲，它保证在 fence signal operation 之后，在 queue submission 中提交的 commands，以及更早之前提交的 commands，它们的写操作在 device domain 上都 available 了（因此要让之前的 memory access 在 host 上可见，仍然需要额外的 pipeline barrier）
 ### Binary and Timeline Semaphores
 binary semaphore 只有 reset 和 signal 两种状态。刚创建出来是 reset 状态，然后一些函数会产生 semaphore signal operation，将其设置为 signal 状态，通过 wait semaphore 可以将 signal 状态的 semaphore 又设置为 reset 状态（然后又可以复用该 semaphore），一个相关的讨论见 [Can I check if a semaphore has signaled already?](https://community.khronos.org/t/can-i-check-if-a-semaphore-has-signaled-already/108055)
 
